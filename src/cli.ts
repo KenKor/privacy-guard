@@ -1,10 +1,12 @@
-// The privacy-guard command line: `due`, `report`, `draft`, `send`, `reply`, `receipt`, `discard`.
+// The privacy-guard command line: `due`, `report`, `draft`, `send`, `reply`, `escalate`, `receipt`, `discard`.
 import {
   DEFAULT_LEDGER_PATH,
   type Ledger,
   type LedgerEntry,
   dueOn,
+  escalatedWithoutReply,
   isCalendarDate,
+  isOverdue,
   loadLedger,
   openRequest,
   overdueOn,
@@ -44,7 +46,7 @@ export interface CliEnv {
 
 const SEND_FLAGS = ["--confirm", "--show"];
 
-const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send <broker> [--confirm] [--show] | reply <broker> [YYYY-MM-DD] | receipt <broker> [reference] | discard <broker>>";
+const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send <broker> [--confirm] [--show] | reply <broker> [YYYY-MM-DD] | escalate <broker> [YYYY-MM-DD] | receipt <broker> [reference] | discard <broker>>";
 
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
@@ -71,11 +73,12 @@ export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<
       }
       return send(broker, { confirm: flags.includes("--confirm"), show: flags.includes("--show") }, env);
     }
-    case "reply": {
+    case "reply":
+    case "escalate": {
       const [broker, date] = flags;
-      // reply takes no flags; a flag where the date goes is a mistyped command, not a bad date.
+      // These take no flags; a flag where the date goes is a mistyped command, not a bad date.
       if (broker === undefined || flags.length > 2 || flags.some((arg) => arg.startsWith("--"))) break;
-      return reply(broker, date ?? env.today, env);
+      return (command === "reply" ? reply : escalate)(broker, date ?? env.today, env);
     }
     case "receipt": {
       const [broker, reference] = flags;
@@ -116,6 +119,8 @@ function report(env: CliEnv): number {
     ...sentWithoutDueDate(ledger).map((entry) => `${entry.broker}: ${sent(entry)}, no due date recorded`),
     // A confirmed send that may have reached the broker stays visible until the human resolves it.
     ...submittedWithoutReceipt(ledger).map((entry) => `${entry.broker}: submitted ${entry.dates.submitted}, no receipt`),
+    // The human took it to the authority; it stays red every day until `reply` records the broker's answer.
+    ...escalatedWithoutReply(ledger).map((entry) => `${entry.broker}: ${stateAndDate(entry)}, no reply`),
   ];
   if (lines.length === 0) {
     env.print("nothing is overdue");
@@ -172,6 +177,36 @@ function reply(broker: string, date: string, env: CliEnv): number {
   saveLedger(env.ledgerPath, ledger);
   env.print(`recorded ${broker} as acknowledged ${date}`);
   return 0;
+}
+
+// The human takes an overdue request to the supervisory authority; privacy-guard only records that they did.
+function escalate(broker: string, date: string, env: CliEnv): number {
+  const ledger = loadLedger(env.ledgerPath);
+  const open = openRequest(ledger, broker);
+  if (open === undefined || !isOverdue(open.entry, env.today)) {
+    env.print(`${broker}: ${escalateRefusal(foundInstead(ledger, broker, open?.entry), env.today)}`);
+    return 1;
+  }
+  const { entry } = open;
+  const refusal = dateRefusal(date, entry.dates.sent, env.today);
+  if (refusal !== undefined) {
+    env.print(refusal);
+    return 1;
+  }
+  entry.state = "escalated";
+  entry.dates.escalated = date;
+  saveLedger(env.ledgerPath, ledger);
+  env.print(`recorded ${broker} as escalated ${date}; it stays in report until a reply is recorded`);
+  return 0;
+}
+
+// Why the broker's open request, if any, cannot be escalated today.
+function escalateRefusal(entry: LedgerEntry | undefined, today: string): string {
+  if (entry === undefined) return "no request to escalate";
+  if (entry.state === "escalated") return `already ${stateAndDate(entry)}`;
+  if (entry.state !== "sent") return `only an overdue sent request can be escalated; found ${stateAndDate(entry)}`;
+  if (entry.dates.due === undefined) return `not overdue: ${stateAndDate(entry)} has no due date recorded`;
+  return `not overdue until after its due date, ${entry.dates.due} (today is ${today})`;
 }
 
 // The human's word that a submission without a receipt arrived, with the reference from the broker's mail if any.

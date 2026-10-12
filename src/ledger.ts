@@ -22,7 +22,7 @@ export interface LedgerEntry {
    * `submitted` is the first confirmed submission that got no receipt: the request may or may not
    * have reached the broker, so a `drafted` entry with it stays in `report` until resolved.
    */
-  dates: { drafted?: string; submitted?: string; sent?: string; acknowledged?: string; due?: string };
+  dates: { drafted?: string; submitted?: string; sent?: string; acknowledged?: string; escalated?: string; due?: string };
 }
 
 export interface Ledger {
@@ -113,15 +113,24 @@ export interface Overdue {
  * Derived on every read, never stored. A `sent` entry without a due date cannot be judged; see `sentWithoutDueDate`.
  */
 export function overdueOn(ledger: Ledger, today: string): Overdue[] {
-  return ledger.entries.flatMap((entry) => {
-    const due = entry.dates.due;
-    return entry.state === "sent" && due !== undefined && today > due ? [{ entry, daysOverdue: daysBetween(due, today) }] : [];
-  });
+  return ledger.entries.flatMap((entry) =>
+    isOverdue(entry, today) ? [{ entry, daysOverdue: daysBetween(entry.dates.due, today) }] : [],
+  );
+}
+
+/** Whether the entry is overdue on `today`: stored state `sent`, a due date, and `today` strictly after it. */
+export function isOverdue(entry: LedgerEntry, today: string): entry is LedgerEntry & { dates: { due: string } } {
+  return entry.state === "sent" && entry.dates.due !== undefined && today > entry.dates.due;
 }
 
 /** `sent` requests with no due date recorded: neither overdue nor not, so `report` warns about them. */
 export function sentWithoutDueDate(ledger: Ledger): LedgerEntry[] {
   return ledger.entries.filter((entry) => entry.state === "sent" && entry.dates.due === undefined);
+}
+
+/** `escalated` requests: taken to the supervisory authority, still without the broker's reply. */
+export function escalatedWithoutReply(ledger: Ledger): LedgerEntry[] {
+  return ledger.entries.filter((entry) => entry.state === "escalated");
 }
 
 /**

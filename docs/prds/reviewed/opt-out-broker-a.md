@@ -1021,7 +1021,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   `report`, and lets `draft` work again; it refuses a `sent` entry, a `drafted` entry with no
   submission, and a broker with no entry, naming which. `reply` needs only item 2 and can be sliced
   out ahead of item 7. Blocked by: 2, 7 (`receipt`, `discard`).
-- [ ] **9. `escalate`.** [#16](https://github.com/KenKor/privacy-guard/issues/16) Follows D-1. `dates.escalated?` on `LedgerEntry` (the ISO-date check
+- [x] **9. `escalate`.** [#16](https://github.com/KenKor/privacy-guard/issues/16) Follows D-1. `dates.escalated?` on `LedgerEntry` (the ISO-date check
   covers it). `escalate <broker> [YYYY-MM-DD]` as in Commands, with its refusals; `report` lists every
   `escalated` entry as "<broker>: escalated <date>, no reply" and exits 1 while one exists; `due`
   and `dueOn` stay unchanged. `GLOSSARY.md` gains **Escalated**. Usage line updated. Tests:

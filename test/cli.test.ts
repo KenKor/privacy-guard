@@ -150,7 +150,6 @@ describe("privacy-guard send", () => {
     dates: { drafted: "2026-10-12", ...dates },
   });
   const withDraft = (dates?: LedgerEntry["dates"]) => withLedger([drafted(dates)]);
-  const entriesIn = (ledgerPath: string): LedgerEntry[] => JSON.parse(readFileSync(ledgerPath, "utf8")).entries;
   const answered = (status: number, body: string) => async (): Promise<Outcome> => ({ kind: "response", status, body });
   const failed = (reason: "timeout" | "too-large" | "error", code?: string) => async (): Promise<Outcome> =>
     reason === "error" ? { kind: "failed", reason, code } : { kind: "failed", reason };
@@ -173,7 +172,7 @@ describe("privacy-guard send", () => {
     expect(output).toMatch(/broker-b broker-c/);
     expect(output).toMatch(/nothing was sent/i);
     expect(deliver).not.toHaveBeenCalled();
-    expect(entriesIn(ledgerPath)).toEqual([drafted()]);
+    expect(entriesOf(ledgerPath)).toEqual([drafted()]);
   });
 
   it("refuses a flag it does not know, naming it, rather than reading it as a dry run", async () => {
@@ -194,7 +193,7 @@ describe("privacy-guard send", () => {
     expect(output).toMatch(/request_type\s+both/);
     for (const value of exampleValues) expect(output).not.toContain(value);
     expect(deliver).not.toHaveBeenCalled();
-    expect(entriesIn(ledgerPath)).toEqual([drafted()]);
+    expect(entriesOf(ledgerPath)).toEqual([drafted()]);
   });
 
   it("with --show, before or after the broker, prints the subject's values", async () => {
@@ -251,7 +250,7 @@ describe("privacy-guard send", () => {
     const ledgerPath = withDraft();
     const { code, output } = await run(confirmed(), ledgerPath, { deliver: answered(200, receiptPage) });
     expect({ code, output }).toEqual({ code: 0, output: "sent to broker-a, receipt BA-482915, due 2026-11-12" });
-    expect(entriesIn(ledgerPath)).toEqual([
+    expect(entriesOf(ledgerPath)).toEqual([
       { broker: "broker-a", state: "sent", reference: "BA-482915", dates: { drafted: "2026-10-12", sent: "2026-10-12", due: "2026-11-12" } },
     ]);
   });
@@ -261,7 +260,7 @@ describe("privacy-guard send", () => {
     const { code, output } = await run(confirmed(), ledgerPath, { deliver: answered(200, receiptPage), today: "2026-10-14" });
     expect(code).toBe(0);
     expect(output).toContain("sent to broker-a, receipt BA-482915, due 2026-11-12");
-    expect(entriesIn(ledgerPath)[0]).toMatchObject({
+    expect(entriesOf(ledgerPath)[0]).toMatchObject({
       state: "sent",
       reference: "BA-482915",
       dates: { submitted: "2026-10-12", sent: "2026-10-12", due: "2026-11-12" },
@@ -271,7 +270,7 @@ describe("privacy-guard send", () => {
   it("on a receipt with no earlier submission dates the request today", async () => {
     const ledgerPath = withDraft();
     await run(confirmed(), ledgerPath, { deliver: answered(200, receiptPage), today: "2026-10-14" });
-    expect(entriesIn(ledgerPath)[0].dates).toEqual({ drafted: "2026-10-12", sent: "2026-10-14", due: "2026-11-14" });
+    expect(entriesOf(ledgerPath)[0].dates).toEqual({ drafted: "2026-10-12", sent: "2026-10-14", due: "2026-11-14" });
   });
 
   // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 7 (replaces "not implemented yet": a pre-connection failure).
@@ -281,14 +280,14 @@ describe("privacy-guard send", () => {
     const result = await run(confirmed(), ledgerPath, { deliver });
     expect(result.code).toBe(1);
     expect(result.output).toMatch(new RegExp(`nothing was sent to broker-a.*${code}`));
-    expect(entriesIn(ledgerPath)).toEqual([drafted()]);
+    expect(entriesOf(ledgerPath)).toEqual([drafted()]);
   });
 
   it("after a pre-connection failure keeps an earlier submission date", async () => {
     const ledgerPath = withDraft({ submitted: "2026-10-10" });
     const deliver = failed("error", "ECONNREFUSED");
     await run(confirmed(), ledgerPath, { deliver });
-    expect(entriesIn(ledgerPath)).toEqual([drafted({ submitted: "2026-10-10" })]);
+    expect(entriesOf(ledgerPath)).toEqual([drafted({ submitted: "2026-10-10" })]);
   });
 
   const indexHtml = readFileSync("sites/broker-a/index.html", "utf8");
@@ -313,7 +312,7 @@ describe("privacy-guard send", () => {
     expect(output).toMatch(/may or may not have arrived/);
     expect(output).toContain("Check Broker A's mail before sending again.");
     expect(output).not.toMatch(/notice|instructions|attacker/i);
-    expect(entriesIn(ledgerPath)).toEqual([drafted({ submitted: "2026-10-12" })]);
+    expect(entriesOf(ledgerPath)).toEqual([drafted({ submitted: "2026-10-12" })]);
     expect(await run(["report"], ledgerPath)).toEqual({ code: 1, output: "broker-a: submitted 2026-10-12, no receipt" });
   });
 
@@ -328,14 +327,14 @@ describe("privacy-guard send", () => {
     expect(code).toBe(1);
     expect(output).toMatch(/the request may have reached broker-a, but .* could not be written/);
     expect(output).toMatch(record);
-    expect(entriesIn(ledgerPath)).toEqual([drafted()]);
+    expect(entriesOf(ledgerPath)).toEqual([drafted()]);
   });
 
   it("after a second failure keeps the first submission date", async () => {
     const ledgerPath = withDraft({ submitted: "2026-10-12" });
     const deliver = failed("timeout");
     expect((await run(confirmed(), ledgerPath, { deliver, today: "2026-10-14" })).code).toBe(1);
-    expect(entriesIn(ledgerPath)).toEqual([drafted({ submitted: "2026-10-12" })]);
+    expect(entriesOf(ledgerPath)).toEqual([drafted({ submitted: "2026-10-12" })]);
   });
 
   it("warns first when an earlier submission got no receipt, dry run and confirmed", async () => {
@@ -545,6 +544,93 @@ describe("privacy-guard reply", () => {
     const { code, output } = await run(["reply", "broker-a", "2026-11-05", "extra"], ledgerPath, { today: "2026-11-05" });
     expect(code).toBe(2);
     expect(output).toContain("reply <broker> [YYYY-MM-DD]");
+    expect(entriesOf(ledgerPath)).toEqual([sentToBrokerA]);
+  });
+});
+
+describe("privacy-guard escalate", () => {
+  const sentToBrokerA: LedgerEntry = { broker: "broker-a", state: "sent", reference: "BA-482915", dates: { sent: "2026-10-12", due: "2026-11-12" } };
+  const escalatedBrokerA: LedgerEntry = { ...sentToBrokerA, state: "escalated", dates: { ...sentToBrokerA.dates, escalated: "2026-11-16" } };
+
+  it("marks an overdue sent request escalated today by default", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    expect(await run(["escalate", "broker-a"], ledgerPath, { today: "2026-11-16" })).toEqual({
+      code: 0,
+      output: "recorded broker-a as escalated 2026-11-16; it stays in report until a reply is recorded",
+    });
+    expect(entriesOf(ledgerPath)).toEqual([escalatedBrokerA]);
+  });
+
+  it("marks it escalated on the given date", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    expect((await run(["escalate", "broker-a", "2026-11-16"], ledgerPath, { today: "2026-11-20" })).code).toBe(0);
+    expect(entriesOf(ledgerPath)).toEqual([escalatedBrokerA]);
+  });
+
+  it("escalates a sent request with no reference", async () => {
+    const { reference: _, ...withoutReference } = sentToBrokerA;
+    const ledgerPath = withLedger([withoutReference]);
+    expect((await run(["escalate", "broker-a"], ledgerPath, { today: "2026-11-16" })).code).toBe(0);
+    const { reference: __, ...escalatedWithoutReference } = escalatedBrokerA;
+    expect(entriesOf(ledgerPath)).toEqual([escalatedWithoutReference]);
+  });
+
+  it.each([
+    ["no request", [], "broker-a: no request to escalate"],
+    ["a sent request on its due date", [sentToBrokerA], "broker-a: not overdue until after its due date, 2026-11-12 (today is 2026-11-12)"],
+    [
+      "a sent request with no due date",
+      [{ broker: "broker-a", state: "sent", dates: { sent: "2026-10-12" } }],
+      "broker-a: not overdue: sent 2026-10-12 has no due date recorded",
+    ],
+    [
+      "a drafted request",
+      [{ broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-10" } }],
+      "broker-a: only an overdue sent request can be escalated; found drafted 2026-10-10",
+    ],
+    [
+      "an acknowledged request",
+      [{ broker: "broker-a", state: "acknowledged", dates: { sent: "2026-09-01", acknowledged: "2026-09-20" } }],
+      "broker-a: only an overdue sent request can be escalated; found acknowledged 2026-09-20",
+    ],
+    ["an escalated request", [escalatedBrokerA], "broker-a: already escalated 2026-11-16"],
+  ] as [string, LedgerEntry[], string][])("refuses a broker with %s, naming why, and writes nothing", async (_, entries, message) => {
+    const ledgerPath = withLedger(entries);
+    expect(await run(["escalate", "broker-a"], ledgerPath, { today: "2026-11-12" })).toEqual({ code: 1, output: message });
+    expect(entriesOf(ledgerPath)).toEqual(entries);
+  });
+
+  it.each([
+    ["a malformed date", "16 Nov 2026", 'date "16 Nov 2026" is not a YYYY-MM-DD date'],
+    ["a date that does not exist", "2026-11-31", 'date "2026-11-31" is not a YYYY-MM-DD date'],
+    ["a date after today", "2026-11-17", "date 2026-11-17 lies after today, 2026-11-16"],
+    ["a date before the sent date", "2026-10-11", "date 2026-10-11 lies before the sent date, 2026-10-12"],
+  ])("refuses %s and writes nothing", async (_, date, message) => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    expect(await run(["escalate", "broker-a", date], ledgerPath, { today: "2026-11-16" })).toEqual({ code: 1, output: message });
+    expect(entriesOf(ledgerPath)).toEqual([sentToBrokerA]);
+  });
+
+  it("keeps it in report, which fails, until reply records one", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    expect((await run(["escalate", "broker-a"], ledgerPath, { today: "2026-11-16" })).code).toBe(0);
+    expect(await run(["report"], ledgerPath, { today: "2026-12-20" })).toEqual({ code: 1, output: "broker-a: escalated 2026-11-16, no reply" });
+    expect((await run(["reply", "broker-a", "2026-12-20"], ledgerPath, { today: "2026-12-20" })).code).toBe(0);
+    expect(await run(["report"], ledgerPath, { today: "2026-12-20" })).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+
+  it("leaves it in due", async () => {
+    const ledgerPath = withLedger([escalatedBrokerA]);
+    expect(await run(["due"], ledgerPath, { today: "2026-11-20" })).toEqual({ code: 0, output: "broker-a: escalated, due 2026-11-12" });
+  });
+
+  it("without a broker, or with a flag, prints usage naming escalate and writes nothing", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    for (const argv of [["escalate"], ["escalate", "broker-a", "--confirm"], ["escalate", "broker-a", "2026-11-16", "extra"]]) {
+      const { code, output } = await run(argv, ledgerPath, { today: "2026-11-16" });
+      expect(code).toBe(2);
+      expect(output).toContain("escalate <broker> [YYYY-MM-DD]");
+    }
     expect(entriesOf(ledgerPath)).toEqual([sentToBrokerA]);
   });
 });
