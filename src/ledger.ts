@@ -1,7 +1,7 @@
 // The request ledger: one entry per request to a broker, kept in a local, git-ignored JSON file.
 // It holds only what tracking a request needs (broker, state, dates, the broker's receipt reference),
 // no personal data.
-// A request's due date is one calendar month from sending (`dueDate`); whoever records the send stores it.
+// A request's due date is one calendar month from sending, moved off a weekend (`dueDate`); whoever records the send stores it.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 export const DEFAULT_LEDGER_PATH = "ledger.json";
@@ -69,7 +69,13 @@ export function dueDate(sent: string): string {
   const dueYear = month === 12 ? year + 1 : year;
   const dueMonth = month === 12 ? 1 : month + 1;
   const dueDay = Math.min(day, daysInMonth(dueYear, dueMonth));
-  return `${String(dueYear).padStart(4, "0")}-${String(dueMonth).padStart(2, "0")}-${String(dueDay).padStart(2, "0")}`;
+  // D-17: a due date on a Saturday or Sunday moves to the following Monday.
+  const due = new Date(Date.UTC(dueYear, dueMonth - 1, dueDay));
+  due.setUTCFullYear(dueYear);
+  const weekday = due.getUTCDay();
+  if (weekday === 6) due.setUTCDate(due.getUTCDate() + 2);
+  if (weekday === 0) due.setUTCDate(due.getUTCDate() + 1);
+  return `${String(due.getUTCFullYear()).padStart(4, "0")}-${String(due.getUTCMonth() + 1).padStart(2, "0")}-${String(due.getUTCDate()).padStart(2, "0")}`;
 }
 
 /** Whether `date` is YYYY-MM-DD and a day the calendar has (not 2026-02-30). */
