@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Ledger, dueOn, loadLedger, saveLedger } from "../src/ledger.ts";
+import { type Ledger, dueDate, dueOn, loadLedger, saveLedger } from "../src/ledger.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "ledger-")), "ledger.json");
 
@@ -63,4 +63,38 @@ describe("dueOn", () => {
   it("returns nothing for an empty ledger", () => {
     expect(dueOn({ entries: [] }, "2026-10-12")).toEqual([]);
   });
+});
+
+describe("dueDate", () => {
+  it("is the same day one calendar month after the sent date", () => {
+    expect(dueDate("2026-10-12")).toBe("2026-11-12");
+  });
+
+  it("crosses into the next year from December", () => {
+    expect(dueDate("2026-12-15")).toBe("2027-01-15");
+  });
+
+  it("keeps the year four digits", () => {
+    expect(dueDate("0099-12-31")).toBe("0100-01-31");
+    expect(dueDate("0099-11-30")).toBe("0099-12-30");
+  });
+
+  // Never later than the law allows, so no rolling over into the month after.
+  it.each([
+    ["2026-01-31", "2026-02-28"],
+    ["2028-01-31", "2028-02-29"],
+    ["2100-01-31", "2100-02-28"],
+    ["2000-01-31", "2000-02-29"],
+    ["2026-03-31", "2026-04-30"],
+    ["2026-08-31", "2026-09-30"],
+  ])("is the last day of the target month when it has no such day: %s -> %s", (sent, due) => {
+    expect(dueDate(sent)).toBe(due);
+  });
+
+  it.each(["12/10/2026", "2026-13-05", "2026-00-10", "2026-02-30", "2026-04-31", "2026-10-00"])(
+    "rejects a sent date that is not a YYYY-MM-DD calendar date: %s",
+    (sent) => {
+      expect(() => dueDate(sent)).toThrow(`sent date "${sent}" is not a YYYY-MM-DD date`);
+    },
+  );
 });

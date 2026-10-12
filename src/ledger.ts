@@ -1,6 +1,6 @@
 // The request ledger: one entry per request to a broker, kept in a local, git-ignored JSON file.
 // It holds only what tracking a request needs (broker, state, dates), no personal data.
-// Deadline logic (one calendar month from sending) is not here yet; whoever records an entry sets its due date.
+// A request's due date is one calendar month from sending (`dueDate`); whoever records the send stores it.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 export const DEFAULT_LEDGER_PATH = "ledger.json";
@@ -48,6 +48,26 @@ export function loadLedger(path: string = DEFAULT_LEDGER_PATH): Ledger {
 
 export function saveLedger(path: string, ledger: Ledger): void {
   writeFileSync(path, JSON.stringify(ledger, null, 2) + "\n");
+}
+
+/**
+ * The due date of a request sent on `sent` (YYYY-MM-DD): one calendar month later, or the last day of
+ * that month when it has no such day (never later than the law allows). Calendar months, not 30 days.
+ */
+export function dueDate(sent: string): string {
+  const [year, month, day] = sent.split("-").map(Number);
+  if (!ISO_DATE.test(sent) || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
+    throw new Error(`sent date "${sent}" is not a YYYY-MM-DD date`);
+  }
+  const dueYear = month === 12 ? year + 1 : year;
+  const dueMonth = month === 12 ? 1 : month + 1;
+  const dueDay = Math.min(day, daysInMonth(dueYear, dueMonth));
+  return `${String(dueYear).padStart(4, "0")}-${String(dueMonth).padStart(2, "0")}-${String(dueDay).padStart(2, "0")}`;
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28;
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
 
 /** Entries still waiting on the broker whose due date is `today` or earlier. */
