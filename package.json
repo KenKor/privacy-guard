@@ -14,7 +14,7 @@
   "scripts": {
     "test": "vitest run",
     "lint": "tsc --noEmit",
-    "site": "python3 -m http.server 8080 --bind localhost --directory sites/broker-a"
+    "site": "node sites/broker-a/main.ts"
   },
   "dependencies": {
     "yaml": "^2.9.1"

@@ -968,7 +968,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   confirmed-send line say the marker applies to an agent's tool calls (Guarding the send). Add
   **Open request** to GLOSSARY.md. Assertion changed: `test/cli.test.ts` lines 66-70 ("draft says it
   is not implemented yet"). Blocked by: 1.
-- [ ] **5. The local site answers the form's POST.** [#11](https://github.com/KenKor/privacy-guard/issues/11) As in The local site. `sites/broker-a/server.ts`
+- [x] **5. The local site answers the form's POST.** [#11](https://github.com/KenKor/privacy-guard/issues/11) As in The local site. `sites/broker-a/server.ts`
   (`startSite(port)`) and `sites/broker-a/main.ts`; `npm run site` runs `main.ts`; `sites` added to
   `tsconfig.json` `include`. `index.html` and the fixture do not change. Tests in
   `test/broker-a-site.test.ts`, with the server started in-process on a free port (an agent's `curl`
