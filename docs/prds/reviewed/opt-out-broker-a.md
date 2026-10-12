@@ -9,7 +9,7 @@ after its due date (one calendar month after it was sent).
 
 **Status:** reviewed, 2026-10-12. Written from a completed grilling session with the user, the
 evidence in the repo, and the user's decisions in the review session that followed. All decisions
-are resolved (D-1 to D-16), and the PRD moved to `reviewed/` on the user's confirmation. Tickets
+are resolved (D-1 to D-17; D-17 is an amendment of 2026-10-12), and the PRD moved to `reviewed/` on the user's confirmation. Tickets
 published 2026-10-12 as #7 to #17 (sub-issues of #2). Code facts verified at `66295b1`.
 
 ## Purpose and background
@@ -65,7 +65,7 @@ running.
 ```console
 $ privacy-guard draft broker-a
 POST http://localhost:8080/  (form#opt-out-form)
-  full_name         [subject.full_name]
+  name              [subject.full_name]
   email             [subject.email]
   phone             [subject.phone]
   job_title         [subject.job_title]
@@ -78,7 +78,7 @@ drafted a request to broker-a. Review it, then: privacy-guard send broker-a --co
 $ privacy-guard send broker-a --show       # dry run, values shown: contacts nothing
 dry run: nothing was sent. A real send needs --confirm.
 POST http://localhost:8080/  (form#opt-out-form)
-  full_name         Alex Example
+  name              Alex Example
   email             alex.example@example.org
   phone             +00 000 000 000
   job_title         Test Engineer
@@ -146,7 +146,7 @@ form:
   url: http://localhost:8080/
   selector: "form#opt-out-form"
   fields:
-    full_name: "{{ subject.full_name }}"
+    name: "{{ subject.full_name }}"
     email: "{{ subject.email }}"
     phone: "{{ subject.phone | optional }}"
     job_title: "{{ subject.job_title | optional }}"
@@ -346,15 +346,17 @@ from a temporary directory and reads only the ledger, so it is unaffected.
 ### Due date and overdue (D-6, D-10)
 
 `dueDate(sent)` is one calendar month after the sent date; when the target month has no such day, the
-last day of that month. Computed on the `YYYY-MM-DD` string, no time zone involved (the CLI's `today`
+last day of that month. A due date that falls on a Saturday or a Sunday moves to the following Monday
+(D-17). Computed on the `YYYY-MM-DD` string, no time zone involved (the CLI's `today`
 is already a local calendar date, `src/cli.ts` line 70).
 
 | Sent | Due |
 |---|---|
 | 2026-10-12 | 2026-11-12 |
 | 2026-12-15 | 2027-01-15 |
-| 2026-01-31 | 2026-02-28 |
+| 2026-01-31 | 2026-03-02 (28 February is a Saturday) |
 | 2028-01-31 | 2028-02-29 |
+| 2026-02-14 | 2026-03-16 (14 March is a Saturday) |
 | 2026-03-31 | 2026-04-30 |
 | 2026-08-31 | 2026-09-30 |
 
@@ -406,7 +408,7 @@ requires.
 `npm run site` serves `sites/broker-a/index.html` on `localhost:8080` at `/` and `/index.html` (the
 hook's self-test fetches `/index.html`, "allow: curl GET of the fake broker page"), and answers a POST to `/`:
 
-- **Valid submission** (`full_name`, `email`, `request_type` and `confirm_identity` present and
+- **Valid submission** (`name`, `email`, `request_type` and `confirm_identity` present and
   non-empty, `request_type` one of the three options): 200 and a thank-you page without the form,
   whose `<p id="thanks">` holds `<strong id="reference">BA-NNNNNN</strong>`, six random digits from
   100000 to 999999, so never the `BA-000000` placeholder. The page carries the same hidden notice as
@@ -422,7 +424,8 @@ as `bin/privacy-guard.js` runs TypeScript directly.
 
 ## Decisions
 
-**Walk order (as walked):** D-15, D-1, D-16. D-15 and D-16 complete D-14's answer. D-1 was walked
+**Walk order (as walked):** D-15, D-1, D-16. D-17 is an amendment walked with the user after the
+tickets were published. D-15 and D-16 complete D-14's answer. D-1 was walked
 before D-16 at the user's request; D-16 touched it only through option (c), which was rejected.
 
 D-2, D-3, D-5, D-6, D-8, D-10, D-11 and D-12 were settled with the user in the grilling session of
@@ -663,6 +666,23 @@ The sheet as walked:
   walked.
 - **Interacts with.** D-6, D-14, D-15, D-1 (resolved: `escalate` acts on the recorded due date).
 
+### D-17: Does a due date that falls on a weekend move?
+
+**RESOLVED 2026-10-12 with the user: (a), a Saturday or Sunday due date moves to the following
+Monday.** Motivation: Regulation (EEC, Euratom) No 1182/71, Article 3(4), which governs time limits
+in EU law, ends a period that would end on a Saturday, a Sunday or a public holiday at the end of the
+following working day. `report` flagging a request as overdue on a Sunday would invite a complaint
+the broker could rightly reject. D-6's "never later than the law allows" still holds: Monday is what
+the law allows. Rejected: (b) public holidays too, because they differ by country and the subject's
+country is not recorded; (c) leave D-6 as it was, which flags requests a day or two early.
+
+- **What it decides.** The due date `dueDate` returns, and so the day `report` first calls a request
+  overdue.
+- **Impact.** `dueDate` in `src/ledger.ts`, and the four existing assertions whose due date falls on
+  a weekend (listed in plan item 11).
+- **Interacts with.** D-6 (the month arithmetic stays), D-1 (escalation starts the day after the
+  moved due date).
+
 ### D-1: What happens after a request becomes overdue?
 
 **RESOLVED 2026-10-12 with the user: option (b) with (b3), the human files; `escalate` records it;
@@ -859,7 +879,7 @@ holds no personal data) and the playbook (one broker's data, not the subject's).
 the target month.** 31 January gives 28 or 29 February; 31 August gives 30 September. The user chose
 the conservative reading: never later than the law allows. Rejected: 30 days (review-checks: deadlines
 are calendar months); rolling over into the next month (2026-01-31 to 2026-03-03, later than the law
-allows).
+allows). D-17 later added the weekend rule on top of this one.
 
 ### D-7: What does a request to broker A contain?
 
@@ -1034,6 +1054,11 @@ existing assertion names it, which is the tester agent's authority once this PRD
   the commands, `--show`, the confirmed send, what to do when a send gets no receipt (`receipt`, `discard`), running `report`
   on a schedule. For the `documenter`
   agent once 1 to 9 are merged. Blocked by: 1 to 9.
+- [x] **11. Weekend due dates.** Follows D-17. `dueDate` moves a Saturday or Sunday due date to the
+  following Monday. Changes every existing assertion whose due date falls on a weekend: in
+  `test/ledger.test.ts`, 2026-01-31 (2026-02-28 becomes 2026-03-02), 2100-01-31 (2100-02-28 becomes
+  2100-03-01) and 0099-12-31 (0100-01-31 becomes 0100-02-01); in `test/cli.test.ts`, the receipt sent
+  2026-10-14 (due 2026-11-14 becomes 2026-11-16). Adds the 2026-02-14 row from Due date and overdue.
 
 Test tiers: the unit tier in `test/` (`npm test`) covers items 1 to 8. The fixture tier stays for
 broker A: `test/broker-a-form.test.ts` against `test/fixtures/broker-a-form.html`, strengthened by item

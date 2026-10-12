@@ -10,7 +10,7 @@ const indexHtml = readFileSync("sites/broker-a/index.html", "utf8");
 
 // The made-up subject; the site stores nothing.
 const validForm = {
-  full_name: "Example Subject",
+  name: "Example Subject",
   email: "subject@example.com",
   request_type: "both",
   confirm_identity: "on",
@@ -75,7 +75,7 @@ describe("the broker A site", () => {
 
   it.each([
     ["missing confirm_identity", { ...validForm, confirm_identity: undefined }],
-    ["with an empty full_name", { ...validForm, full_name: "" }],
+    ["with an empty name", { ...validForm, name: "" }],
     ["with a request_type the form does not offer", { ...validForm, request_type: "sell-more" }],
   ])("answers 400 with no reference to a POST %s", async (_, form) => {
     const fields = Object.fromEntries(Object.entries(form).filter(([, value]) => value !== undefined));

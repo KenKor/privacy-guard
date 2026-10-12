@@ -17,7 +17,7 @@ const brokerA = loadPlaybooks("brokers").find((playbook) => playbook.name === "b
 
 // The made-up subject; the site stores nothing.
 const fields = [
-  { name: "full_name", value: "Alex Example" },
+  { name: "name", value: "Alex Example" },
   { name: "email", value: "alex.example@example.org" },
   { name: "request_type", value: "both" },
   { name: "confirm_identity", value: "on" },
