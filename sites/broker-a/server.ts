@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 const indexHtml = readFileSync(new URL("index.html", import.meta.url), "utf8");
 
 const REQUEST_TYPES: readonly string[] = ["erasure", "objection", "both"];
-const REQUIRED_FIELDS = ["full_name", "email", "request_type", "confirm_identity"];
+const REQUIRED_FIELDS = ["name", "email", "request_type", "confirm_identity"];
 const MAX_BODY_BYTES = 64 * 1024;
 
 // The thank-you page is the opt-out page without its form and script, with the receipt shown,
