@@ -236,6 +236,105 @@ describe("privacy-guard draft", () => {
   });
 });
 
+describe("privacy-guard reply", () => {
+  const sentToBrokerA: LedgerEntry = { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } };
+  const entriesOf = (ledgerPath: string) => JSON.parse(readFileSync(ledgerPath, "utf8")).entries;
+
+  it("marks a sent request acknowledged today by default", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    const { code, output } = await run(["reply", "broker-a"], ledgerPath, { today: "2026-11-05" });
+    expect(code).toBe(0);
+    expect(output).toBe("recorded broker-a as acknowledged 2026-11-05");
+    expect(entriesOf(ledgerPath)).toEqual([
+      { broker: "broker-a", state: "acknowledged", dates: { sent: "2026-10-12", due: "2026-11-12", acknowledged: "2026-11-05" } },
+    ]);
+  });
+
+  it("marks an escalated request (a hand-written ledger) acknowledged on the given date", async () => {
+    const escalated = { ...sentToBrokerA, state: "escalated" as const };
+    const ledgerPath = withLedger([escalated]);
+    const { code, output } = await run(["reply", "broker-a", "2026-11-20"], ledgerPath, { today: "2026-11-25" });
+    expect(code).toBe(0);
+    expect(output).toBe("recorded broker-a as acknowledged 2026-11-20");
+    expect(entriesOf(ledgerPath)).toEqual([
+      { broker: "broker-a", state: "acknowledged", dates: { sent: "2026-10-12", due: "2026-11-12", acknowledged: "2026-11-20" } },
+    ]);
+  });
+
+  it("takes an overdue request out of report", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    expect((await run(["report"], ledgerPath, { today: "2026-11-13" })).code).toBe(1);
+    expect((await run(["reply", "broker-a", "2026-11-13"], ledgerPath, { today: "2026-11-13" })).code).toBe(0);
+    expect(await run(["report"], ledgerPath, { today: "2026-11-13" })).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+
+  it.each([
+    ["no entry", [], "broker-a has no sent or escalated request: found no request"],
+    [
+      "a drafted entry",
+      [{ broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-10" } }],
+      "broker-a has no sent or escalated request: found drafted 2026-10-10",
+    ],
+    [
+      "an acknowledged entry",
+      [{ broker: "broker-a", state: "acknowledged", dates: { sent: "2026-09-01", acknowledged: "2026-09-20" } }],
+      "broker-a has no sent or escalated request: found acknowledged 2026-09-20",
+    ],
+  ] as [string, LedgerEntry[], string][])("refuses a broker with %s, naming what it found, and writes nothing", async (_, entries, message) => {
+    const ledgerPath = withLedger(entries);
+    expect(await run(["reply", "broker-a"], ledgerPath)).toEqual({ code: 1, output: message });
+    expect(entriesOf(ledgerPath)).toEqual(entries);
+  });
+
+  it.each([
+    ["a malformed date", "5 Nov 2026", 'date "5 Nov 2026" is not a YYYY-MM-DD date'],
+    ["a date that does not exist", "2026-02-30", 'date "2026-02-30" is not a YYYY-MM-DD date'],
+    ["a date after today", "2026-11-06", "date 2026-11-06 lies after today, 2026-11-05"],
+    ["a date before the sent date", "2026-10-11", "date 2026-10-11 lies before the sent date, 2026-10-12"],
+  ])("refuses %s and writes nothing", async (_, date, message) => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    expect(await run(["reply", "broker-a", date], ledgerPath, { today: "2026-11-05" })).toEqual({ code: 1, output: message });
+    expect(entriesOf(ledgerPath)).toEqual([sentToBrokerA]);
+  });
+
+  it("accepts the sent date itself", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    expect((await run(["reply", "broker-a", "2026-10-12"], ledgerPath, { today: "2026-11-05" })).code).toBe(0);
+  });
+
+  it("without a broker prints usage naming reply", async () => {
+    const { code, output } = await run(["reply"]);
+    expect(code).toBe(2);
+    expect(output).toContain("reply <broker> [YYYY-MM-DD]");
+  });
+
+  it("acts on the open request, not an earlier acknowledged one", async () => {
+    const earlier: LedgerEntry = { broker: "broker-a", state: "acknowledged", dates: { sent: "2026-08-01", acknowledged: "2026-08-20" } };
+    const ledgerPath = withLedger([earlier, sentToBrokerA]);
+    expect((await run(["reply", "broker-a"], ledgerPath, { today: "2026-11-05" })).code).toBe(0);
+    expect(entriesOf(ledgerPath)).toEqual([
+      earlier,
+      { broker: "broker-a", state: "acknowledged", dates: { sent: "2026-10-12", due: "2026-11-12", acknowledged: "2026-11-05" } },
+    ]);
+  });
+
+  it("with a flag prints usage and writes nothing", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    const { code, output } = await run(["reply", "broker-a", "--show"], ledgerPath);
+    expect(code).toBe(2);
+    expect(output).toContain("reply <broker> [YYYY-MM-DD]");
+    expect(entriesOf(ledgerPath)).toEqual([sentToBrokerA]);
+  });
+
+  it("with an argument after the date prints usage and writes nothing", async () => {
+    const ledgerPath = withLedger([sentToBrokerA]);
+    const { code, output } = await run(["reply", "broker-a", "2026-11-05", "extra"], ledgerPath, { today: "2026-11-05" });
+    expect(code).toBe(2);
+    expect(output).toContain("reply <broker> [YYYY-MM-DD]");
+    expect(entriesOf(ledgerPath)).toEqual([sentToBrokerA]);
+  });
+});
+
 describe("privacy-guard with an unknown command", () => {
   it("prints usage and fails", async () => {
     const { code, output } = await run(["frobnicate"]);

@@ -1,13 +1,15 @@
-// The privacy-guard command line: `due`, `report`, `draft`, `send`.
+// The privacy-guard command line: `due`, `report`, `draft`, `send`, `reply`.
 import {
   DEFAULT_LEDGER_PATH,
   type LedgerEntry,
   dueOn,
+  isCalendarDate,
   loadLedger,
   openRequest,
   overdueOn,
   saveLedger,
   sentWithoutDueDate,
+  stateDate,
 } from "./ledger.ts";
 import { DEFAULT_BROKERS_DIR, loadPlaybooks } from "./playbook.ts";
 import { formatSubmission, renderFields } from "./render.ts";
@@ -24,7 +26,7 @@ export interface CliEnv {
   print: (line: string) => void;
 }
 
-const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send [--confirm]>";
+const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send [--confirm] | reply <broker> [YYYY-MM-DD]>";
 
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
@@ -41,6 +43,12 @@ export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<
     }
     case "send":
       return send(flags.includes("--confirm"), env);
+    case "reply": {
+      const [broker, date] = flags;
+      // reply takes no flags; a flag where the date goes is a mistyped command, not a bad date.
+      if (broker === undefined || flags.length > 2 || flags.some((arg) => arg.startsWith("--"))) break;
+      return reply(broker, date ?? env.today, env);
+    }
   }
   env.print(USAGE);
   return 2;
@@ -87,8 +95,7 @@ function draft(broker: string, show: boolean, env: CliEnv): number {
   const ledger = loadLedger(env.ledgerPath);
   const open = openRequest(ledger, broker);
   if (open !== undefined) {
-    const { entry, date } = open;
-    env.print(`${broker} already has an open request: ${entry.state}${date === undefined ? "" : ` ${date}`}`);
+    env.print(`${broker} already has an open request: ${stateAndDate(open.entry)}`);
     return 1;
   }
   let fields;
@@ -106,6 +113,44 @@ function draft(broker: string, show: boolean, env: CliEnv): number {
   env.print("");
   env.print(`drafted a request to ${broker}. Review it, then: privacy-guard send ${broker} --confirm`);
   return 0;
+}
+
+// The human records the broker's reply by hand; privacy-guard does not read the inbox.
+function reply(broker: string, date: string, env: CliEnv): number {
+  const ledger = loadLedger(env.ledgerPath);
+  const open = openRequest(ledger, broker);
+  if (open === undefined || (open.entry.state !== "sent" && open.entry.state !== "escalated")) {
+    // With no open request, name the broker's latest (acknowledged) entry, if any.
+    const latest = open?.entry ?? ledger.entries.filter((entry) => entry.broker === broker).at(-1);
+    env.print(`${broker} has no sent or escalated request: found ${latest === undefined ? "no request" : stateAndDate(latest)}`);
+    return 1;
+  }
+  const { entry } = open;
+  const refusal = dateRefusal(date, entry.dates.sent, env.today);
+  if (refusal !== undefined) {
+    env.print(refusal);
+    return 1;
+  }
+  entry.state = "acknowledged";
+  entry.dates.acknowledged = date;
+  saveLedger(env.ledgerPath, ledger);
+  env.print(`recorded ${broker} as acknowledged ${date}`);
+  return 0;
+}
+
+// "<state> <date>", the date the entry reached its state; the state alone when that date is not recorded.
+function stateAndDate(entry: LedgerEntry): string {
+  const date = stateDate(entry);
+  return `${entry.state}${date === undefined ? "" : ` ${date}`}`;
+}
+
+// Why a date the human gives for something that happened is refused: not a real day, in the future, or before
+// the send. Undefined when it is accepted.
+function dateRefusal(date: string, sent: string | undefined, today: string): string | undefined {
+  if (!isCalendarDate(date)) return `date "${date}" is not a YYYY-MM-DD date`;
+  if (date > today) return `date ${date} lies after today, ${today}`;
+  if (sent !== undefined && date < sent) return `date ${date} lies before the sent date, ${sent}`;
+  return undefined;
 }
 
 // Every send goes through the guard; no channel can deliver yet, so a confirmed send fails.

@@ -56,14 +56,18 @@ export function saveLedger(path: string, ledger: Ledger): void {
  * that month when it has no such day (never later than the law allows). Calendar months, not 30 days.
  */
 export function dueDate(sent: string): string {
+  if (!isCalendarDate(sent)) throw new Error(`sent date "${sent}" is not a YYYY-MM-DD date`);
   const [year, month, day] = sent.split("-").map(Number);
-  if (!ISO_DATE.test(sent) || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
-    throw new Error(`sent date "${sent}" is not a YYYY-MM-DD date`);
-  }
   const dueYear = month === 12 ? year + 1 : year;
   const dueMonth = month === 12 ? 1 : month + 1;
   const dueDay = Math.min(day, daysInMonth(dueYear, dueMonth));
   return `${String(dueYear).padStart(4, "0")}-${String(dueMonth).padStart(2, "0")}-${String(dueDay).padStart(2, "0")}`;
+}
+
+/** Whether `date` is YYYY-MM-DD and a day the calendar has (not 2026-02-30). */
+export function isCalendarDate(date: string): boolean {
+  const [year, month, day] = date.split("-").map(Number);
+  return ISO_DATE.test(date) && month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
 }
 
 function daysInMonth(year: number, month: number): number {
@@ -75,7 +79,12 @@ function daysInMonth(year: number, month: number): number {
 export function openRequest(ledger: Ledger, broker: string): { entry: LedgerEntry; date?: string } | undefined {
   const entry = ledger.entries.find((candidate) => candidate.broker === broker && candidate.state !== "acknowledged");
   if (entry === undefined) return undefined;
-  return { entry, date: (entry.dates as Record<string, string | undefined>)[entry.state] };
+  return { entry, date: stateDate(entry) };
+}
+
+/** The date the entry reached its current state, if recorded. */
+export function stateDate(entry: LedgerEntry): string | undefined {
+  return (entry.dates as Record<string, string | undefined>)[entry.state];
 }
 
 /** Entries still waiting on the broker whose due date is `today` or earlier. */
