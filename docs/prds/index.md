@@ -5,8 +5,9 @@
 ### new/ (0): untriaged intake
 
 
-### triaged/ (0): triaged, tracked as an issue
+### triaged/ (1): triaged, tracked as an issue
 
+- [opt-out-broker-a.md](triaged/opt-out-broker-a.md): Draft an opt-out request to broker A, wait for a confirmed send, and track the one-month deadline.
 
 ### research/ (0): spike in progress
 
