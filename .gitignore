@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.privacy-guard/
+ledger.json
