@@ -270,7 +270,8 @@ describe("privacy-guard send", () => {
   it("on a receipt with no earlier submission dates the request today", async () => {
     const ledgerPath = withDraft();
     await run(confirmed(), ledgerPath, { deliver: answered(200, receiptPage), today: "2026-10-14" });
-    expect(entriesOf(ledgerPath)[0].dates).toEqual({ drafted: "2026-10-12", sent: "2026-10-14", due: "2026-11-14" });
+    // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (2026-11-14 is a Saturday, so 2026-11-16).
+    expect(entriesOf(ledgerPath)[0].dates).toEqual({ drafted: "2026-10-12", sent: "2026-10-14", due: "2026-11-16" });
   });
 
   // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 7 (replaces "not implemented yet": a pre-connection failure).

@@ -184,20 +184,33 @@ describe("dueDate", () => {
   });
 
   it("keeps the year four digits", () => {
-    expect(dueDate("0099-12-31")).toBe("0100-01-31");
+    // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (0100-01-31 is a Sunday, so 0100-02-01).
+    expect(dueDate("0099-12-31")).toBe("0100-02-01");
     expect(dueDate("0099-11-30")).toBe("0099-12-30");
   });
 
   // Never later than the law allows, so no rolling over into the month after.
   it.each([
-    ["2026-01-31", "2026-02-28"],
     ["2028-01-31", "2028-02-29"],
-    ["2100-01-31", "2100-02-28"],
     ["2000-01-31", "2000-02-29"],
     ["2026-03-31", "2026-04-30"],
     ["2026-08-31", "2026-09-30"],
   ])("is the last day of the target month when it has no such day: %s -> %s", (sent, due) => {
     expect(dueDate(sent)).toBe(due);
+  });
+
+  // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (weekend due dates move to Monday):
+  // these rows were 2026-02-28 (a Saturday) and 2100-02-28 (a Sunday) under the last-day test above.
+  it.each([
+    ["2026-01-31", "2026-03-02"],
+    ["2100-01-31", "2100-03-01"],
+  ])("is the following Monday when the target month's last day falls on a weekend: %s -> %s", (sent, due) => {
+    expect(dueDate(sent)).toBe(due);
+  });
+
+  // Added under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (the 2026-02-14 row; 14 March is a Saturday).
+  it("moves a Saturday due date to the following Monday: 2026-02-14 -> 2026-03-16", () => {
+    expect(dueDate("2026-02-14")).toBe("2026-03-16");
   });
 
   it.each(["12/10/2026", "2026-13-05", "2026-00-10", "2026-02-30", "2026-04-31", "2026-10-00"])(
