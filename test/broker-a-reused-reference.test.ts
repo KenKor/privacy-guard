@@ -11,7 +11,9 @@ import type { Outcome } from "../src/send.ts";
 // records the request as sent and starts a deadline broker A never had. The expected outcome below
 // is the owner's report as a test; what send should do instead is not decided yet.
 describe("privacy-guard send, broker A reuses an earlier reference", () => {
-  it("does not start a new deadline on a reference broker A already gave an earlier request", async () => {
+  // Skipped until the behaviour is decided: hospital issue #34
+  // (https://github.com/KenKor/privacy-guard/issues/34).
+  it.skip("does not start a new deadline on a reference broker A already gave an earlier request", async () => {
     const ledgerPath = join(mkdtempSync(join(tmpdir(), "reused-")), "ledger.json");
     const earlier: LedgerEntry = {
       broker: "broker-a",
