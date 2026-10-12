@@ -90,7 +90,7 @@ describe("dueOn", () => {
   const ledger: Ledger = {
     entries: [
       { broker: "due-today", state: "sent", dates: { sent: "2026-09-12", due: "2026-10-12" } },
-      // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 2 (overdue is derived, not stored).
+      // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 2 (overdue is derived, not stored).
       { broker: "past-due", state: "sent", dates: { sent: "2026-08-01", due: "2026-09-01" } },
       { broker: "due-later", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
       { broker: "answered", state: "acknowledged", dates: { sent: "2026-09-01", due: "2026-10-01" } },
@@ -184,7 +184,7 @@ describe("dueDate", () => {
   });
 
   it("keeps the year four digits", () => {
-    // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (0100-01-31 is a Sunday, so 0100-02-01).
+    // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 11 (0100-01-31 is a Sunday, so 0100-02-01).
     expect(dueDate("0099-12-31")).toBe("0100-02-01");
     expect(dueDate("0099-11-30")).toBe("0099-12-30");
   });
@@ -199,7 +199,7 @@ describe("dueDate", () => {
     expect(dueDate(sent)).toBe(due);
   });
 
-  // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (weekend due dates move to Monday):
+  // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 11 (weekend due dates move to Monday):
   // these rows were 2026-02-28 (a Saturday) and 2100-02-28 (a Sunday) under the last-day test above.
   it.each([
     ["2026-01-31", "2026-03-02"],
@@ -208,7 +208,7 @@ describe("dueDate", () => {
     expect(dueDate(sent)).toBe(due);
   });
 
-  // Added under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (the 2026-02-14 row; 14 March is a Saturday).
+  // Added under docs/prds/implemented/opt-out-broker-a.md, plan item 11 (the 2026-02-14 row; 14 March is a Saturday).
   it("moves a Saturday due date to the following Monday: 2026-02-14 -> 2026-03-16", () => {
     expect(dueDate("2026-02-14")).toBe("2026-03-16");
   });

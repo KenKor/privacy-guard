@@ -157,7 +157,7 @@ describe("privacy-guard send", () => {
   const exampleValues = ["Alex Example", "alex.example@example.org", "+00 000 000 000", "Test Engineer"];
   const confirmed = (...rest: string[]) => ["send", "broker-a", "--confirm", ...rest];
 
-  // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 7 (send takes one broker; usage without one).
+  // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 7 (send takes one broker; usage without one).
   it("without a broker prints usage", async () => {
     const { code, output } = await run(["send", "--confirm"]);
     expect(code).toBe(2);
@@ -181,7 +181,7 @@ describe("privacy-guard send", () => {
     expect(output).toMatch(/refusing: --confrim\. Nothing was sent/);
   });
 
-  // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 7 (the dry run prints the submission, run as `send broker-a`).
+  // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 7 (the dry run prints the submission, run as `send broker-a`).
   it("without --confirm prints the submission masked and contacts nothing", async () => {
     const deliver = vi.fn(answered(200, receiptPage));
     const ledgerPath = withDraft();
@@ -234,7 +234,7 @@ describe("privacy-guard send", () => {
         broker: "broker-a",
         url: "http://localhost:8080/",
         fields: [
-          // Changed under the owner's approval of 2026-10-13: broker A renamed its form field full_name to name (3fca10a).
+          // Changed under the owner's approval of 2026-10-13: broker A renamed its form field full_name to name (6d0fce0, tag cp7-broken).
           { name: "name", value: "Alex Example" },
           { name: "email", value: "alex.example@example.org" },
           { name: "phone", value: "+00 000 000 000" },
@@ -246,7 +246,7 @@ describe("privacy-guard send", () => {
     }
   });
 
-  // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 7 (a confirmed send with a fake deliver now succeeds).
+  // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 7 (a confirmed send with a fake deliver now succeeds).
   it("on a receipt records the request as sent, with its reference and due date", async () => {
     const ledgerPath = withDraft();
     const { code, output } = await run(confirmed(), ledgerPath, { deliver: answered(200, receiptPage) });
@@ -271,11 +271,11 @@ describe("privacy-guard send", () => {
   it("on a receipt with no earlier submission dates the request today", async () => {
     const ledgerPath = withDraft();
     await run(confirmed(), ledgerPath, { deliver: answered(200, receiptPage), today: "2026-10-14" });
-    // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 11 (2026-11-14 is a Saturday, so 2026-11-16).
+    // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 11 (2026-11-14 is a Saturday, so 2026-11-16).
     expect(entriesOf(ledgerPath)[0].dates).toEqual({ drafted: "2026-10-12", sent: "2026-10-14", due: "2026-11-16" });
   });
 
-  // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 7 (replaces "not implemented yet": a pre-connection failure).
+  // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 7 (replaces "not implemented yet": a pre-connection failure).
   it.each(["ECONNREFUSED", "ENOTFOUND"])("after a pre-connection failure (%s) says nothing was sent and leaves the request unchanged", async (code) => {
     const ledgerPath = withDraft();
     const deliver = failed("error", code);
@@ -360,7 +360,7 @@ describe("privacy-guard draft", () => {
     const { code, output } = await run(["draft", "broker-a"]);
     expect(code).toBe(0);
     expect(output).toContain("POST http://localhost:8080/  (form#opt-out-form)");
-    // Changed under the owner's approval of 2026-10-13: broker A renamed its form field full_name to name (3fca10a).
+    // Changed under the owner's approval of 2026-10-13: broker A renamed its form field full_name to name (6d0fce0, tag cp7-broken).
     expect(output).toMatch(/^\s+name\s+\[subject\.full_name\]/m);
     expect(output).toMatch(/email\s+\[subject\.email\]/);
     expect(output).toMatch(/request_type\s+both/);
@@ -791,7 +791,7 @@ describe("privacy-guard with an unknown command", () => {
 });
 
 describe("guardedSend", () => {
-  // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 7 (SendRequest carries the address and fields; deliver returns the outcome).
+  // Changed under docs/prds/implemented/opt-out-broker-a.md, plan item 7 (SendRequest carries the address and fields; deliver returns the outcome).
   const request: SendRequest = { broker: "broker-a", url: "http://localhost:8080/", fields: [{ name: "request_type", value: "both" }] };
   const outcome: Outcome = { kind: "response", status: 200, body: "" };
 
