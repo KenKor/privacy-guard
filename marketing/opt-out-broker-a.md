@@ -1,6 +1,6 @@
 # Opt out of broker A: from draft to deadline
 
-Source: [docs/prds/implemented/opt-out-broker-a.md](../docs/prds/implemented/opt-out-broker-a.md)
+Source: [docs/prds/completed/opt-out-broker-a.md](../docs/prds/completed/opt-out-broker-a.md)
 (issue #2). Claims below were checked against the code on `main` at `383f659` (`src/`, `bin/`,
 `brokers/broker-a.yaml`). privacy-guard is not legal advice, and nothing here is.
 
