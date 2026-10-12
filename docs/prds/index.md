@@ -19,7 +19,7 @@
 
 ### implemented/ (1): all tickets closed, suite green, review and docs pending
 
-- [opt-out-broker-a.md](implemented/opt-out-broker-a.md) `10/11`: Ask broker A through its web form to erase the subject's data and stop selling it: `draft` the request, submit the form only on a confirmed send, record the receipt reference from broker A's thank-you page, record the reply by hand, and have `report` flag the request as overdue from the day after its due date (one calendar month after it was sent).
+- [opt-out-broker-a.md](implemented/opt-out-broker-a.md) `11/11`: Ask broker A through its web form to erase the subject's data and stop selling it: `draft` the request, submit the form only on a confirmed send, record the receipt reference from broker A's thank-you page, record the reply by hand, and have `report` flag the request as overdue from the day after its due date (one calendar month after it was sent).
 
 ### blocked/ (0): parked by necessity
 

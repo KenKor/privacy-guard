@@ -46,7 +46,7 @@ A drafted request whose confirmed send may have reached the broker but brought b
 _Avoid_: failed, pending, half-sent
 
 **Sent**:
-A request is sent once a confirmed send has gone out to the broker. The sent date starts the deadline.
+A request is sent once the broker's receipt is recorded: from the confirmed send's answer, or by hand with `receipt`. The sent date is the date of the first submission, and it starts the deadline. A confirmed send with no receipt leaves the request submitted, not sent.
 
 **Receipt**:
 The broker's confirmation that it got a request, usually with a reference. A receipt is not a reply.
@@ -59,7 +59,7 @@ _Avoid_: response, receipt
 ### Deadlines
 
 **Due date**:
-One calendar month after the sent date (GDPR Article 12(3)). When that month has no matching day, it is the last day of the month.
+One calendar month after the sent date (GDPR Article 12(3)). When that month has no matching day, it is the last day of the month. A due date that falls on a Saturday or Sunday moves to the following Monday; public holidays are not considered.
 _Avoid_: deadline date, 30 days
 
 **Overdue**:

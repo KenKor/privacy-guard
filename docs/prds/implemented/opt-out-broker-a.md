@@ -11,7 +11,7 @@ after its due date (one calendar month after it was sent).
 evidence in the repo, and the user's decisions in the review session that followed. All decisions
 are resolved (D-1 to D-17; D-17 is an amendment of 2026-10-12), and the PRD moved to `reviewed/` on
 the user's confirmation. Tickets published 2026-10-12 as #7 to #17 (sub-issues of #2); #7 to #16
-are closed, and #17 (user docs) is open as the documenter's step. Post-implementation review
+are closed, and #17 (user docs) is done in PR #37: the README, from the code at `383f659`. Post-implementation review
 (`prd-reviewer`, 2026-10-13, against `9840561`): **MATCHES WITH NOTES**. Every decision D-1 to D-17
 is implemented and tested, and the suite, lint and link check pass. The notes are drift in this
 document, not in the code: the background and Proposal still cite line numbers from the skeleton,
@@ -1059,7 +1059,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   broker with no entry, and a date after today, before `dates.sent` or malformed; `report` lists an
   escalated entry and exits 1; `reply` takes it out and `report` exits 0; `due` still lists it; a
   `sent` entry with no `reference` can be escalated. Blocked by: 2, 8.
-- [ ] **10. User docs.** [#17](https://github.com/KenKor/privacy-guard/issues/17) README: setting up `subject.yaml` (values quoted), running `npm run site`,
+- [x] **10. User docs.** [#17](https://github.com/KenKor/privacy-guard/issues/17) README: setting up `subject.yaml` (values quoted), running `npm run site`,
   the commands, `--show`, the confirmed send, what to do when a send gets no receipt (`receipt`, `discard`), running `report`
   on a schedule. For the `documenter`
   agent once 1 to 9 are merged. Blocked by: 1 to 9.
