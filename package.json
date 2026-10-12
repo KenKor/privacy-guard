@@ -17,11 +17,11 @@
     "site": "node sites/broker-a/main.ts"
   },
   "dependencies": {
+    "node-html-parser": "^9.0.4",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "node-html-parser": "^9.0.4",
     "typescript": "^7.0.2",
     "vitest": "^5.0.4"
   }

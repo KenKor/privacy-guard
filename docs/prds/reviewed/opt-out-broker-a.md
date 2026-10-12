@@ -990,7 +990,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   chained send (`... send --confirm broker-a; ... send --confirm broker-b`) and a send in a loop are
   denied even with the marker; the existing cases (lines 110-126) still pass. Run
   `.claude/hooks/deny-outward-send.sh --selftest`. Blocked by: none. Item 7 must not merge before it.
-- [ ] **7. `send <broker> --confirm` submits the form.** [#13](https://github.com/KenKor/privacy-guard/issues/13) Follows D-4, D-6, D-13, D-14, D-16.
+- [x] **7. `send <broker> --confirm` submits the form.** [#13](https://github.com/KenKor/privacy-guard/issues/13) Follows D-4, D-6, D-13, D-14, D-16.
   `send <broker> [--confirm] [--show]` with the refusals in Commands;
   `SendRequest` carries the address and rendered fields; `Deliver` returns the outcome; the HTTP
   `deliver` with `fetch`, form encoding, `redirect: "manual"`, the 10-second timeout and the 1 MB cap

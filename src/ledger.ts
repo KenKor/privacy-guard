@@ -1,5 +1,6 @@
 // The request ledger: one entry per request to a broker, kept in a local, git-ignored JSON file.
-// It holds only what tracking a request needs (broker, state, dates), no personal data.
+// It holds only what tracking a request needs (broker, state, dates, the broker's receipt reference),
+// no personal data.
 // A request's due date is one calendar month from sending (`dueDate`); whoever records the send stores it.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -15,7 +16,13 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export interface LedgerEntry {
   broker: string;
   state: State;
-  dates: { drafted?: string; sent?: string; acknowledged?: string; due?: string };
+  /** The broker's receipt reference, such as "BA-482915". Not personal data. */
+  reference?: string;
+  /**
+   * `submitted` is the first confirmed submission that got no receipt: the request may or may not
+   * have reached the broker, so a `drafted` entry with it stays in `report` until resolved.
+   */
+  dates: { drafted?: string; submitted?: string; sent?: string; acknowledged?: string; due?: string };
 }
 
 export interface Ledger {
@@ -40,6 +47,7 @@ export function loadLedger(path: string = DEFAULT_LEDGER_PATH): Ledger {
     if (typeof entry.dates !== "object" || entry.dates === null || Array.isArray(entry.dates)) {
       fail(`expected a "dates" object`);
     }
+    if (entry.reference !== undefined && typeof entry.reference !== "string") fail("reference must be a string");
     for (const [name, date] of Object.entries(entry.dates)) {
       if (typeof date !== "string" || !ISO_DATE.test(date)) fail(`dates.${name} "${date}" is not a YYYY-MM-DD date`);
     }
@@ -114,6 +122,33 @@ export function overdueOn(ledger: Ledger, today: string): Overdue[] {
 /** `sent` requests with no due date recorded: neither overdue nor not, so `report` warns about them. */
 export function sentWithoutDueDate(ledger: Ledger): LedgerEntry[] {
   return ledger.entries.filter((entry) => entry.state === "sent" && entry.dates.due === undefined);
+}
+
+/**
+ * Marks a request sent on a receipt. The sent date is the first submission's when there was one, as it
+ * may be the one that arrived (D-16), else `today`; the due date follows from it.
+ */
+export function recordSent(entry: LedgerEntry, reference: string, today: string): void {
+  const sent = entry.dates.submitted ?? today;
+  entry.state = "sent";
+  entry.reference = reference;
+  entry.dates.sent = sent;
+  entry.dates.due = dueDate(sent);
+}
+
+/**
+ * Records a confirmed submission that got no receipt; the request stays `drafted`. The first attempt's
+ * date stays, so a later receipt never dates the request later than the law allows. A date after
+ * `today` (a hand edit or a wrong clock) is not an earlier attempt, so `today` replaces it.
+ */
+export function recordSubmitted(entry: LedgerEntry, today: string): void {
+  const submitted = entry.dates.submitted;
+  if (submitted === undefined || submitted > today) entry.dates.submitted = today;
+}
+
+/** `drafted` requests whose confirmed submission got no receipt: they may have reached the broker. */
+export function submittedWithoutReceipt(ledger: Ledger): LedgerEntry[] {
+  return ledger.entries.filter((entry) => entry.state === "drafted" && entry.dates.submitted !== undefined);
 }
 
 // UTC midnights, so no daylight-saving shift can make a day 23 or 25 hours long.

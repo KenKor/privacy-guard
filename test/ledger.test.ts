@@ -2,7 +2,17 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Ledger, dueDate, dueOn, loadLedger, overdueOn, saveLedger, sentWithoutDueDate } from "../src/ledger.ts";
+import {
+  type Ledger,
+  type LedgerEntry,
+  dueDate,
+  dueOn,
+  loadLedger,
+  overdueOn,
+  recordSubmitted,
+  saveLedger,
+  sentWithoutDueDate,
+} from "../src/ledger.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "ledger-")), "ledger.json");
 
@@ -46,6 +56,29 @@ describe("ledger", () => {
     expect(() => loadLedger(path)).toThrow(`${path}: entry 0: dates.due "12/10/2026" is not a YYYY-MM-DD date`);
   });
 
+  it("round-trips a receipt reference and a submission date", () => {
+    const path = tmpLedger();
+    const ledger: Ledger = {
+      entries: [
+        { broker: "broker-a", state: "sent", reference: "BA-482915", dates: { submitted: "2026-10-12", sent: "2026-10-12", due: "2026-11-12" } },
+      ],
+    };
+    saveLedger(path, ledger);
+    expect(loadLedger(path)).toEqual(ledger);
+  });
+
+  it("rejects a reference that is not a string", () => {
+    const path = tmpLedger();
+    writeFileSync(path, JSON.stringify({ entries: [{ broker: "broker-a", state: "sent", reference: 482915, dates: {} }] }));
+    expect(() => loadLedger(path)).toThrow(`${path}: entry 0: reference must be a string`);
+  });
+
+  it("rejects a submission date that is not YYYY-MM-DD", () => {
+    const path = tmpLedger();
+    writeFileSync(path, JSON.stringify({ entries: [{ broker: "broker-a", state: "drafted", dates: { submitted: "today" } }] }));
+    expect(() => loadLedger(path)).toThrow(`${path}: entry 0: dates.submitted "today" is not a YYYY-MM-DD date`);
+  });
+
   it("names the file when it is not valid JSON", () => {
     const path = tmpLedger();
     writeFileSync(path, "{ entries: ");
@@ -71,6 +104,27 @@ describe("dueOn", () => {
 
   it("returns nothing for an empty ledger", () => {
     expect(dueOn({ entries: [] }, "2026-10-12")).toEqual([]);
+  });
+});
+
+describe("recordSubmitted", () => {
+  const drafted = (submitted?: string): LedgerEntry => ({
+    broker: "broker-a",
+    state: "drafted",
+    dates: submitted === undefined ? { drafted: "2026-10-01" } : { drafted: "2026-10-01", submitted },
+  });
+  const submittedAfter = (entry: LedgerEntry) => {
+    recordSubmitted(entry, "2026-10-12");
+    return entry.dates.submitted;
+  };
+
+  it("sets today on a first attempt and keeps an earlier attempt's date", () => {
+    expect(submittedAfter(drafted())).toBe("2026-10-12");
+    expect(submittedAfter(drafted("2026-10-05"))).toBe("2026-10-05");
+  });
+
+  it("replaces a date after today, which cannot be an earlier attempt", () => {
+    expect(submittedAfter(drafted("2026-12-01"))).toBe("2026-10-12");
   });
 });
 

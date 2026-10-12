@@ -41,6 +41,10 @@ _Avoid_: database, log, history
 A send the human explicitly approved. Without that approval, privacy-guard only shows what it would send (a dry run).
 _Avoid_: real send, live send
 
+**Submitted**:
+A drafted request whose confirmed send may have reached the broker but brought back no receipt. It stays drafted, keeps the date of its first such send, and stays in the report until the human resolves it.
+_Avoid_: failed, pending, half-sent
+
 **Sent**:
 A request is sent once a confirmed send has gone out to the broker. The sent date starts the deadline.
 

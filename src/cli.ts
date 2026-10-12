@@ -7,13 +7,26 @@ import {
   loadLedger,
   openRequest,
   overdueOn,
+  recordSent,
+  recordSubmitted,
   saveLedger,
   sentWithoutDueDate,
   stateDate,
+  submittedWithoutReceipt,
 } from "./ledger.ts";
-import { DEFAULT_BROKERS_DIR, loadPlaybooks } from "./playbook.ts";
+import { DEFAULT_BROKERS_DIR, type Playbook, loadPlaybooks } from "./playbook.ts";
+import { type ReceiptReading, readReceipt } from "./receipt.ts";
 import { formatSubmission, renderFields } from "./render.ts";
-import { guardedSend } from "./send.ts";
+import {
+  type Deliver,
+  MAX_RESPONSE_BYTES,
+  type Outcome,
+  TIMEOUT_MS,
+  failureOf,
+  guardedSend,
+  httpDeliver,
+  isPreConnection,
+} from "./send.ts";
 import { DEFAULT_SUBJECT_PATH, loadSubject } from "./subject.ts";
 
 export interface CliEnv {
@@ -24,9 +37,13 @@ export interface CliEnv {
   /** ISO calendar date, YYYY-MM-DD. */
   today: string;
   print: (line: string) => void;
+  /** Submits a confirmed send; `httpDeliver` by default, a fake in tests. */
+  deliver: Deliver;
 }
 
-const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send [--confirm] | reply <broker> [YYYY-MM-DD]>";
+const SEND_FLAGS = ["--confirm", "--show"];
+
+const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send <broker> [--confirm] [--show] | reply <broker> [YYYY-MM-DD]>";
 
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
@@ -41,8 +58,18 @@ export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<
       if (broker === undefined) break;
       return draft(broker, flags.includes("--show"), env);
     }
-    case "send":
-      return send(flags.includes("--confirm"), env);
+    case "send": {
+      const [broker, ...extraBrokers] = flags.filter((arg) => !arg.startsWith("--"));
+      if (broker === undefined) break;
+      // One approval reaches one broker; a shell-expanded broker-{a,b} arrives here as two arguments,
+      // and a mistyped flag is refused rather than read as a dry run.
+      const extra = [...flags.filter((arg) => arg.startsWith("--") && !SEND_FLAGS.includes(arg)), ...extraBrokers];
+      if (extra.length > 0) {
+        env.print(`send takes one broker and only --confirm and --show; refusing: ${extra.join(" ")}. Nothing was sent.`);
+        return 1;
+      }
+      return send(broker, { confirm: flags.includes("--confirm"), show: flags.includes("--show") }, env);
+    }
     case "reply": {
       const [broker, date] = flags;
       // reply takes no flags; a flag where the date goes is a mistyped command, not a bad date.
@@ -76,6 +103,8 @@ function report(env: CliEnv): number {
     ),
     // Passing a request that cannot be judged silently would be a false green.
     ...sentWithoutDueDate(ledger).map((entry) => `${entry.broker}: ${sent(entry)}, no due date recorded`),
+    // A confirmed send that may have reached the broker stays visible until the human resolves it.
+    ...submittedWithoutReceipt(ledger).map((entry) => `${entry.broker}: submitted ${entry.dates.submitted}, no receipt`),
   ];
   if (lines.length === 0) {
     env.print("nothing is overdue");
@@ -87,11 +116,8 @@ function report(env: CliEnv): number {
 
 // Refuses before writing anything; the ledger gets broker and date only, never a rendered value.
 function draft(broker: string, show: boolean, env: CliEnv): number {
-  const playbook = loadPlaybooks(env.brokersDir).find((candidate) => candidate.name === broker);
-  if (playbook === undefined) {
-    env.print(`no playbook for ${broker} in ${env.brokersDir}`);
-    return 1;
-  }
+  const playbook = findPlaybook(broker, env);
+  if (playbook === undefined) return 1;
   const ledger = loadLedger(env.ledgerPath);
   const open = openRequest(ledger, broker);
   if (open !== undefined) {
@@ -153,25 +179,100 @@ function dateRefusal(date: string, sent: string | undefined, today: string): str
   return undefined;
 }
 
-// Every send goes through the guard; no channel can deliver yet, so a confirmed send fails.
-async function send(confirm: boolean, env: CliEnv): Promise<number> {
-  if (!confirm) env.print("dry run: nothing was sent. A real send needs --confirm.");
-  const drafted = loadLedger(env.ledgerPath).entries.filter((entry) => entry.state === "drafted");
-  if (drafted.length === 0) env.print("no drafted requests to send.");
-  for (const entry of drafted) {
-    try {
-      const result = await guardedSend({ broker: entry.broker }, { confirm, deliver: noChannel });
-      if (!result.sent) env.print(`would send to ${entry.broker}`);
-    } catch (error) {
-      env.print(`${(error as Error).message}, so nothing was sent to ${entry.broker}.`);
-      return 1;
-    }
+// One broker's one drafted request, through the guard. A confirmed send that may have reached the
+// broker without a receipt is recorded as submitted and stays drafted, so `report` keeps showing it.
+async function send(broker: string, { confirm, show }: { confirm: boolean; show: boolean }, env: CliEnv): Promise<number> {
+  const playbook = findPlaybook(broker, env);
+  if (playbook === undefined) return 1;
+  const ledger = loadLedger(env.ledgerPath);
+  const drafted = ledger.entries.filter((entry) => entry.broker === broker && entry.state === "drafted");
+  if (drafted.length === 0) {
+    env.print(`no drafted request for ${broker}. Draft one first: privacy-guard draft ${broker}`);
+    return 1;
   }
-  return 0;
+  if (drafted.length > 1) {
+    env.print(`${broker} has ${drafted.length} drafted requests in ${env.ledgerPath}; expected one. Nothing was sent.`);
+    return 1;
+  }
+  const [entry] = drafted;
+  const submitted = entry.dates.submitted;
+  if (submitted !== undefined) {
+    env.print(`a submission on ${submitted} got no receipt; check ${playbook.display_name}'s mail before sending again`);
+  }
+  let fields;
+  try {
+    fields = renderFields(playbook.form.fields, loadSubject(env.subjectPath));
+  } catch (error) {
+    env.print((error as Error).message);
+    return 1;
+  }
+
+  const request = { broker, url: playbook.form.url, fields: fields.map(({ name, value }) => ({ name, value })) };
+  let result;
+  try {
+    result = await guardedSend(request, { confirm, deliver: env.deliver });
+  } catch (error) {
+    result = { sent: true as const, outcome: failureOf(error) };
+  }
+  if (!result.sent) {
+    env.print("dry run: nothing was sent. A real send needs --confirm.");
+    for (const line of formatSubmission(playbook.form, fields, show)) env.print(line);
+    if (!show) env.print(`Subject values are hidden. To see them: privacy-guard send ${broker} --show`);
+    return 0;
+  }
+
+  const { outcome } = result;
+  if (isPreConnection(outcome)) {
+    env.print(`nothing was sent to ${broker}: the connection failed (${outcome.code})`);
+    return 1;
+  }
+  const reading = outcome.kind === "response" && isSuccess(outcome.status) ? readReceipt(outcome.body, playbook) : undefined;
+  const reference = reading !== undefined && "reference" in reading ? reading.reference : undefined;
+  if (reference !== undefined) recordSent(entry, reference, env.today);
+  else recordSubmitted(entry, env.today);
+  try {
+    saveLedger(env.ledgerPath, ledger);
+  } catch (error) {
+    // The request may have reached the broker; a lost record would leave `report` silent about it.
+    env.print(`the request may have reached ${broker}, but ${env.ledgerPath} could not be written: ${(error as Error).message}`);
+    env.print(
+      reference === undefined
+        ? `Record it by hand: state drafted, dates.submitted ${entry.dates.submitted}.`
+        : `Record it by hand: state sent, reference ${reference}, dates.sent ${entry.dates.sent}, dates.due ${entry.dates.due}.`,
+    );
+    return 1;
+  }
+  if (reference !== undefined) {
+    env.print(`sent to ${broker}, receipt ${reference}, due ${entry.dates.due}`);
+    return 0;
+  }
+  env.print(`${broker} ${noReceiptCase(outcome, reading)}; the request may or may not have arrived.`);
+  env.print(`Check ${playbook.display_name}'s mail before sending again.`);
+  return 1;
 }
 
-function noChannel(): never {
-  throw new Error("send is not implemented yet: no channel can send");
+const statusClass = (status: number) => Math.floor(status / 100);
+const isSuccess = (status: number) => statusClass(status) === 2;
+
+// Names what happened, never the page's text: the broker's response is untrusted content.
+function noReceiptCase(outcome: Outcome, reading: ReceiptReading | undefined): string {
+  if (outcome.kind === "failed") {
+    if (outcome.reason === "timeout") return `timed out after ${TIMEOUT_MS / 1000} seconds`;
+    if (outcome.reason === "too-large") return `answered with more than ${MAX_RESPONSE_BYTES / (1024 * 1024)} MB, which was not read`;
+    return `could not be reached to the end (${outcome.code ?? "no error code"})`;
+  }
+  if (statusClass(outcome.status) === 3) return `answered ${outcome.status}, a redirect, which was not followed`;
+  if (!isSuccess(outcome.status)) return `answered ${outcome.status}`;
+  if (reading !== undefined && "missing" in reading && reading.missing === "form-returned") {
+    return `answered ${outcome.status} with the form again`;
+  }
+  return `answered ${outcome.status} without a receipt reference`;
+}
+
+function findPlaybook(broker: string, env: CliEnv): Playbook | undefined {
+  const playbook = loadPlaybooks(env.brokersDir).find((candidate) => candidate.name === broker);
+  if (playbook === undefined) env.print(`no playbook for ${broker} in ${env.brokersDir}`);
+  return playbook;
 }
 
 function defaultEnv(): CliEnv {
@@ -181,6 +282,7 @@ function defaultEnv(): CliEnv {
     subjectPath: DEFAULT_SUBJECT_PATH,
     today: localDate(new Date()),
     print: (line) => console.log(line),
+    deliver: httpDeliver,
   };
 }
 
