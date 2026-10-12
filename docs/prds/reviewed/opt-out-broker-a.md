@@ -38,7 +38,7 @@ What the skeleton (`66295b1`) already has, and what this PRD builds on:
 | `brokers/broker-a.yaml` | `channel: web-form`, `form:` block with templated `fields` (lines 12-18), `reply.acknowledged_when` with `selector: "#thanks"` and `reference_pattern: "BA-[0-9]{6}"` (lines 22-24) | Kept; only the `acknowledged_when` block moves to `receipt` (D-3) |
 | `test/broker-a-form.test.ts`, `test/fixtures/broker-a-form.html` | Contract test of the playbook against a saved copy of the form; the fixture is byte-identical to `sites/broker-a/index.html` | Kept; the contract test gains checks (item 1) |
 | `sites/broker-a/`, `npm run site` | The fictitious broker's page, served by `python3 -m http.server` (`package.json`), which serves every file in the directory and cannot answer a POST; training material with a deliberate prompt injection (lines 35-42). The page's script (lines 76-84) stops the browser from submitting and makes up a reference on the spot, so nothing ever reaches the server | Page unchanged; `npm run site` becomes a small Node server that also answers the form's POST with a thank-you page (item 5) |
-| `.claude/hooks/deny-outward-send.sh` | Denies `privacy-guard[[:space:]]+send` (line 37) without `--confirm` and the marker; removes the marker once per allowed tool call (line 78) | Hardened before `send` can deliver (item 6, Guarding the send) |
+| `.claude/hooks/deny-outward-send.sh` | Denies a send (`SEND_PATTERN`) without `--confirm` and the marker; removes the marker once per allowed tool call (`allow_once`) | Hardened before `send` can deliver (item 6, Guarding the send) |
 | `.gitignore` | `ledger.json`, `.privacy-guard/` | Adds `subject.yaml` (D-5) |
 
 The invariants this design must keep are in [review-checks.md](../../agents/review-checks.md):
@@ -377,20 +377,25 @@ Two layers stand between an agent and a confirmed send: `--confirm` on the comma
 [deny-outward-send.sh](../../../.claude/hooks/deny-outward-send.sh) on an agent's tool call. A human
 running the command in their own terminal needs `--confirm` only.
 
-Today the hook has two gaps that matter once `send` can deliver (item 7), which is why item 6 hardens
-it first:
+The hook had two gaps that matter once `send` can deliver (item 7); item 6 closed them first:
 
-- **It misses other ways of running the CLI.** Its pattern `privacy-guard[[:space:]]+send` (line 37)
-  does not match `node bin/privacy-guard.js send broker-a --confirm` (the bin's own way of running,
-  `bin/privacy-guard.js` line 2) or `node src/cli.ts send ...`, so those skip the marker check.
-- **One marker can cover several sends.** The hook removes the marker once per tool call it lets
-  through (line 78), and one tool call can chain commands (`;`, `&&`, a loop). D-13 bounds one command
-  to one message; the hook must bound one approval to one command.
+- **It missed other ways of running the CLI.** Its pattern `privacy-guard[[:space:]]+send` did not
+  match `node bin/privacy-guard.js send broker-a --confirm` (the bin's own way of running,
+  `bin/privacy-guard.js` line 2) or `node src/cli.ts send ...`, so those skipped the marker check.
+  `SEND_PATTERN` now matches those, `npx privacy-guard[@version] send` and
+  `npm exec privacy-guard -- send`.
+- **One marker could cover several sends.** The hook removes the marker once per tool call it lets
+  through (`allow_once`), and one tool call can chain commands (`;`, `&&`, a loop). D-13 bounds one
+  command to one message; the hook bounds one approval to one command: a tool call with a send and
+  any `;`, `&`, `|`, newline, backtick, `$(`, `<(` or `>(` (`CHAIN_PATTERN`), or a send run by
+  `xargs`, `watch` or `parallel` (`REPEAT_PATTERN`), is denied even with the marker, and the marker
+  stays.
 
-The hook denies `send` without `--confirm` (line 72; self-test line 117), so an agent cannot run the
-dry run through the binary. For an agent, `draft` is the preview, masked by default; tests call
-`main()` directly and are unaffected. The hook stays a tripwire, not a wall (its header, lines 10-12):
-these changes close the obvious paths, not every path.
+The hook denies `send` without `--confirm` (`allow_once`; self-test "deny: send with marker but no
+flag"), so an agent cannot run the dry run through the binary. For an agent, `draft` is the preview,
+masked by default; tests call `main()` directly and are unaffected. The hook stays a tripwire, not a
+wall (its header says so): these changes close the obvious paths, not every path. Brace expansion
+(`send --confirm broker-{a,b}`) is one command to the hook, which cannot bound it.
 
 Tests never reach a broker: the CLI tests inject `deliver`, and the HTTP `deliver` is tested against
 the local site started in-process on a free port, a local stub as the tester agent's send tier
@@ -399,7 +404,7 @@ requires.
 ### The local site (`npm run site`)
 
 `npm run site` serves `sites/broker-a/index.html` on `localhost:8080` at `/` and `/index.html` (the
-hook's self-test fetches `/index.html`, line 113), and answers a POST to `/`:
+hook's self-test fetches `/index.html`, "allow: curl GET of the fake broker page"), and answers a POST to `/`:
 
 - **Valid submission** (`full_name`, `email`, `request_type` and `confirm_identity` present and
   non-empty, `request_type` one of the three options): 200 and a thank-you page without the form,
@@ -480,7 +485,7 @@ The sheet as walked:
     second as starting a new month is unknown. Neither is verified.
   - `send` runs in scheduled jobs and agent tool calls, where an exit code printed once may go unseen;
     `report` exit 1 is the channel that keeps saying something (D-11).
-  - Each confirmed send uses up the human's marker (hook line 78), so any retry needs a new approval.
+  - Each confirmed send uses up the human's marker (the hook's `allow_once`), so any retry needs a new approval.
 - **Options.** Common to all: a 2xx response that still contains `form.selector` counts as no receipt,
   whatever the pattern finds; and the message names the case (timeout, status, over the cap, form
   returned, no reference), never the page's text.
@@ -699,7 +704,7 @@ The sheet as walked:
     infringement" (same check). Which authority is right depends on the subject, so it is subject
     data, not playbook data, and no file holds it today.
   - A complaint or a second submission is an outward send. review-checks: "Nothing is sent without a
-    confirmed send". The hook's marker is one-shot (`deny-outward-send.sh` lines 16-18, 78), and D-13
+    confirmed send". The hook's marker is one-shot (`deny-outward-send.sh` header and `allow_once`), and D-13
     makes one confirmed send one message.
   - A complaint carries personal data (who complains, about which request); the ledger may not hold it
     ([GLOSSARY.md](../../../GLOSSARY.md), Ledger) and nothing may log it.
@@ -909,10 +914,10 @@ general question; it was not a request. Nothing to record.
 **RESOLVED 2026-10-12 by the user, in the review session: one message to one broker per approval.
 `send` takes the broker, `send <broker> [--confirm]`, and sends only that broker's single `drafted`
 request; the hook lets one approval through one command (item 6).** The hook's marker is used up once
-per tool call (`deny-outward-send.sh` line 78), so both the command and the hook must bound what one
+per tool call (`deny-outward-send.sh`, `allow_once`), so both the command and the hook must bound what one
 approval reaches. `draft` already allows one open request per broker (D-8); `send` refuses a
 hand-edited ledger with two `drafted` entries for the broker. The form matches the hook's self-test,
-`npx privacy-guard send --confirm broker-a` (line 114).
+`npx privacy-guard send --confirm broker-a` ("allow: send with --confirm and marker").
 Rejected:
 - `send` without a broker, refusing a confirmed send when more than one entry is `drafted`. One
   approval's reach would then depend on ledger contents the human did not look at when approving, and
@@ -976,7 +981,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   returns 404; a valid POST returns 200 with a `BA-` reference that is not `BA-000000` and no
   `form#opt-out-form`; a POST missing `confirm_identity` returns 400 with no reference; the thank-you
   page carries the hidden notice. Blocked by: none.
-- [ ] **6. Harden the send hook.** [#12](https://github.com/KenKor/privacy-guard/issues/12) Follows D-4, D-13. In `.claude/hooks/deny-outward-send.sh`: treat a
+- [x] **6. Harden the send hook.** [#12](https://github.com/KenKor/privacy-guard/issues/12) Follows D-4, D-13. In `.claude/hooks/deny-outward-send.sh`: treat a
   send as outward however the CLI is run (`npx privacy-guard send`, `node bin/privacy-guard.js send`,
   `node src/cli.ts send`, `npm exec privacy-guard -- send`), and deny a tool call in which a send is
   not the only command: any `;`, `&`, `|`, newline, backtick or `$(` in a command line that contains a

@@ -4,7 +4,9 @@
 # git-guardrails-claude-code skill (MIT, https://github.com/mattpocock/skills).
 #
 # Denies outward sends unless a human confirmed them:
-#   - `npx privacy-guard send` (the scheduler's send step)
+#   - `privacy-guard send`, however the CLI is run: `npx privacy-guard send` (with or without
+#     `@<version>`), `node bin/privacy-guard.js send` (or the bin script on its own),
+#     `node src/cli.ts send`, `npm exec privacy-guard -- send`
 #   - curl or wget calls that write to the network (POST, PUT, PATCH, DELETE, data or upload flags)
 #   - mail-sending commands (sendmail, mail, mailx, mutt) and raw sockets (nc, ncat, telnet)
 # The patterns are a tripwire, not a wall: an agent that wants to evade them can (a script file,
@@ -16,6 +18,10 @@
 # The marker is one-shot: the hook removes it when it lets a send through, so approval for one
 # send does not carry to the next. Only the human creates the marker, from their own terminal;
 # the hook denies any tool call that would create or touch it.
+# One approval covers one command (D-13): a tool call that contains a send must be that send
+# alone. Any `;`, `&`, `|`, newline, backtick, `$(`, `<(` or `>(` in it is denied, marker or
+# not, and so is a send run by a command that repeats it (xargs, watch, parallel). The marker
+# stays in place.
 #
 # Contract: JSON on stdin with tool_name and tool_input (command for Bash, file_path for
 # Write and Edit). Exit 0 allows. Exit 2 denies; stderr is shown to the model as the reason.
@@ -32,9 +38,19 @@ deny() {
   exit 2
 }
 
-# Outward-write patterns, extended regular expressions, matched against the whole command line.
+# A privacy-guard send, however the CLI is run: the package name (optionally @version), the bin
+# script or the CLI source, optionally quoted, optionally followed by npm exec's `--`, then the
+# send subcommand.
+SEND_PATTERN='(privacy-guard(\.js|@[^[:space:]]+)?|cli\.ts)["'"'"']?([[:space:]]+--)?[[:space:]]+["'"'"']?send(["'"'"'[:space:]]|$)'
+
+# Characters that put a second command, a loop or a substitution into one tool call.
+CHAIN_PATTERN='[;&|`]|[$<>]\('
+
+# Commands that run the command after them more than once.
+REPEAT_PATTERN='(^|[[:space:]])(xargs|watch|parallel)[[:space:]]'
+
+# Other outward-write patterns, extended regular expressions, matched against the whole command line.
 OUTWARD_PATTERNS=(
-  'privacy-guard[[:space:]]+send'
   'curl[[:space:]].*(-X[[:space:]]*|--request[[:space:]=]+)(POST|PUT|PATCH|DELETE)'
   'curl[[:space:]](.*[[:space:]])?(-[dFT]|--data(-[a-z]+)?|--form|--upload-file|--json)'
   'wget[[:space:]].*(--post-data|--post-file|--body-data|--body-file|--method[[:space:]=]+(POST|PUT|PATCH|DELETE))'
@@ -42,8 +58,20 @@ OUTWARD_PATTERNS=(
   '(^|[[:space:];|&(])(nc|ncat|telnet)[[:space:]]'
 )
 
+# Allows a confirmed command once: needs --confirm and the marker, then uses the marker up.
+allow_once() {
+  if [[ "$command" != *"--confirm"* ]]; then
+    deny "'$command' is an outward send and has no --confirm flag."
+  fi
+  if [[ ! -f "$marker" ]]; then
+    deny "'$command' is an outward send and $MARKER_REL does not exist."
+  fi
+  rm -f "$marker"   # one marker, one send
+  exit 0
+}
+
 hook() {
-  local input tool command file_path project marker pattern
+  local input tool command file_path project marker pattern joined flat
   input="$(cat)"
   if ! command -v jq >/dev/null 2>&1; then
     deny "jq is not installed, so the hook cannot read the tool call. Install jq."
@@ -66,24 +94,33 @@ hook() {
     deny "only the user creates or removes $MARKER_REL, from their own terminal."
   fi
 
-  # Layer 2: outward writes need --confirm plus the marker.
+  # Line continuations joined, so a command split across lines is matched as one. A send is also
+  # matched across newlines (flat); the other patterns stay per line, as separate commands.
+  joined="${command//$'\\\n'/ }"
+  flat="${joined//$'\n'/ }"
+
+  # Layer 2: a send needs --confirm plus the marker, and must be the only command in the call.
+  if printf '%s' "$flat" | grep -qE -- "$SEND_PATTERN"; then
+    if [[ "$command" == *$'\n'* ]] || printf '%s' "$command" | grep -qE -- "$CHAIN_PATTERN"; then
+      deny "'$command' runs a send alongside other commands (;, &, |, newline, backtick, \$( <( or >( ). One approval covers one send command, run on its own."
+    fi
+    if printf '%s' "$flat" | grep -qE -- "$REPEAT_PATTERN"; then
+      deny "'$command' runs a send through xargs, watch or parallel, which can repeat it. One approval covers one send command, run on its own."
+    fi
+    allow_once
+  fi
+
+  # Layer 2, continued: other outward writes need --confirm plus the marker.
   for pattern in "${OUTWARD_PATTERNS[@]}"; do
-    if printf '%s' "$command" | grep -qE -- "$pattern"; then
-      if [[ "$command" != *"--confirm"* ]]; then
-        deny "'$command' is an outward send and has no --confirm flag."
-      fi
-      if [[ ! -f "$marker" ]]; then
-        deny "'$command' is an outward send and $MARKER_REL does not exist."
-      fi
-      rm -f "$marker"   # one marker, one send
-      exit 0
+    if printf '%s' "$joined" | grep -qE -- "$pattern"; then
+      allow_once
     fi
   done
   exit 0
 }
 
 selftest() {
-  local self tmp pass=0 fail=0
+  local self tmp pass=0 fail=0 way
   self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
 
@@ -125,6 +162,43 @@ selftest() {
   check 2 no  Bash "mkdir -p .privacy-guard && touch .privacy-guard/confirmed"      "deny: agent creates the marker"
   check 2 no  Write ".privacy-guard/confirmed"                              "deny: agent writes the marker"
 
+  # Every way of running the CLI is a send: denied without the marker or the flag, allowed with both.
+  for way in "npx privacy-guard" "npx privacy-guard@0.1.0" "node bin/privacy-guard.js" \
+             "./bin/privacy-guard.js" "node src/cli.ts" "npm exec privacy-guard --" \
+             "node \"bin/privacy-guard.js\""; do
+    check 2 no  Bash "$way send --confirm broker-a"                         "deny: '$way send', no marker"
+    check 2 yes Bash "$way send broker-a"                                   "deny: '$way send', no flag"
+    check 0 yes Bash "$way send --confirm broker-a"                         "allow: '$way send' with --confirm and marker"
+  done
+
+  # One approval, one command: a send that is not alone in the tool call is denied, marker or not.
+  check 2 yes Bash "npx privacy-guard send --confirm broker-a; npx privacy-guard send --confirm broker-b" \
+                                                                            "deny: two chained sends (;)"
+  check 2 yes Bash "npx privacy-guard send --confirm broker-a && node src/cli.ts send --confirm broker-b" \
+                                                                            "deny: two chained sends (&&)"
+  check 2 yes Bash "npx privacy-guard send --confirm broker-a & npx privacy-guard send --confirm broker-b" \
+                                                                            "deny: send in the background (&)"
+  check 2 yes Bash "for b in broker-a broker-b; do npx privacy-guard send --confirm \"\$b\"; done" \
+                                                                            "deny: send in a loop"
+  check 2 yes Bash $'for b in broker-a broker-b\ndo npx privacy-guard send --confirm "$b"\ndone' \
+                                                                            "deny: send in a loop over newlines"
+  check 2 yes Bash $'npx privacy-guard \\\n  send --confirm broker-a'      "deny: send split by a line continuation"
+  check 2 yes Bash "yes | npx privacy-guard send --confirm broker-a"        "deny: send in a pipe"
+  check 2 yes Bash "npx privacy-guard send --confirm \`echo broker-a\`"     "deny: send with a backtick substitution"
+  check 2 yes Bash "npx privacy-guard send --confirm \$(echo broker-a)"     "deny: send with a \$( substitution"
+  check 2 yes Bash "npx privacy-guard send --confirm broker-a <(npx privacy-guard send --confirm broker-b)" \
+                                                                            "deny: send with a <( substitution"
+  check 2 yes Bash "npx privacy-guard send --confirm broker-a > >(npx privacy-guard send --confirm broker-b)" \
+                                                                            "deny: send with a >( substitution"
+  check 2 yes Bash "xargs -a brokers.txt -n1 npx privacy-guard send --confirm" "deny: send repeated by xargs"
+  check 2 yes Bash "watch -n 60 npx privacy-guard send --confirm broker-a"  "deny: send repeated by watch"
+  check 2 yes Bash "parallel npx privacy-guard send --confirm ::: broker-a broker-b" \
+                                                                            "deny: send repeated by parallel"
+  # The chaining rule is for sends only.
+  check 0 no  Bash "npm test 2>&1 | tail -n 20"                             "allow: chained command without a send"
+  check 0 no  Bash "npx privacy-guard draft broker-a && npx privacy-guard due" "allow: chained commands without a send"
+  check 0 no  Bash $'curl -s http://localhost:8080/index.html\nls -d /tmp'  "allow: curl GET, then another command on the next line"
+
   # One-shot: after an allowed send the marker is gone.
   mkdir -p "$tmp/.privacy-guard"; touch "$tmp/$MARKER_REL"
   jq -nc '{tool_name:"Bash", tool_input:{command:"npx privacy-guard send --confirm broker-a"}}' \
@@ -133,6 +207,16 @@ selftest() {
     pass=$((pass + 1)); echo "ok    marker consumed by the allowed send"
   else
     fail=$((fail + 1)); echo "FAIL  marker still present after the allowed send"
+  fi
+
+  # A denied chained send leaves the marker for the single send the human approved.
+  mkdir -p "$tmp/.privacy-guard"; touch "$tmp/$MARKER_REL"
+  jq -nc '{tool_name:"Bash", tool_input:{command:"npx privacy-guard send --confirm broker-a; npx privacy-guard send --confirm broker-b"}}' \
+    | CLAUDE_PROJECT_DIR="$tmp" "$self" >/dev/null 2>&1
+  if [[ -e "$tmp/$MARKER_REL" ]]; then
+    pass=$((pass + 1)); echo "ok    marker kept after a denied chained send"
+  else
+    fail=$((fail + 1)); echo "FAIL  marker consumed by a denied chained send"
   fi
 
   echo "selftest: $pass passed, $fail failed"
