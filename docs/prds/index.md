@@ -5,15 +5,15 @@
 ### new/ (0): untriaged intake
 
 
-### triaged/ (1): triaged, tracked as an issue
+### triaged/ (0): triaged, tracked as an issue
 
-- [opt-out-broker-a.md](triaged/opt-out-broker-a.md): Draft an opt-out request to broker A, wait for a confirmed send, and track the one-month deadline.
 
 ### research/ (0): spike in progress
 
 
-### designed/ (0): written, decisions open
+### designed/ (1): written, decisions open
 
+- [opt-out-broker-a.md](designed/opt-out-broker-a.md) `0/8`: Ask broker A by email to erase the subject's data and stop selling it: `draft` the request, send it only on a confirmed send over SMTP, record the receipt and the reply by hand, and have `report` flag the request as overdue from the day after its due date (one calendar month after it was sent).
 
 ### reviewed/ (0): decisions closed, ready to slice into tickets
 
