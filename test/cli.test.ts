@@ -4,18 +4,25 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { main } from "../src/cli.ts";
-import { saveLedger } from "../src/ledger.ts";
+import { type LedgerEntry, saveLedger } from "../src/ledger.ts";
 import { guardedSend } from "../src/send.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "cli-")), "ledger.json");
 
+/** A temporary ledger file holding `entries`; returns its path. */
+function withLedger(entries: LedgerEntry[]): string {
+  const ledgerPath = tmpLedger();
+  saveLedger(ledgerPath, { entries });
+  return ledgerPath;
+}
+
 async function run(
   argv: string[],
   ledgerPath = tmpLedger(),
-  { brokersDir = "brokers", subjectPath = "subject.example.yaml" } = {},
+  { brokersDir = "brokers", subjectPath = "subject.example.yaml", today = "2026-10-12" } = {},
 ) {
   const lines: string[] = [];
-  const env = { ledgerPath, brokersDir, subjectPath, today: "2026-10-12", print: (line: string) => lines.push(line) };
+  const env = { ledgerPath, brokersDir, subjectPath, today, print: (line: string) => lines.push(line) };
   const code = await main(argv, env);
   return { code, output: lines.join("\n") };
 }
@@ -26,13 +33,10 @@ describe("privacy-guard due", () => {
   });
 
   it("lists the requests due today", async () => {
-    const ledgerPath = tmpLedger();
-    saveLedger(ledgerPath, {
-      entries: [
-        { broker: "broker-a", state: "sent", dates: { sent: "2026-09-12", due: "2026-10-12" } },
-        { broker: "broker-b", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
-      ],
-    });
+    const ledgerPath = withLedger([
+      { broker: "broker-a", state: "sent", dates: { sent: "2026-09-12", due: "2026-10-12" } },
+      { broker: "broker-b", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
+    ]);
     const { code, output } = await run(["due"], ledgerPath);
     expect(code).toBe(0);
     expect(output).toContain("broker-a");
@@ -40,12 +44,72 @@ describe("privacy-guard due", () => {
   });
 });
 
+describe("privacy-guard report", () => {
+  const sentToBrokerA: LedgerEntry = { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } };
+
+  it("says nothing is overdue on an empty ledger", async () => {
+    expect(await run(["report"])).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+
+  it("says nothing is overdue on the due date itself", async () => {
+    expect(await run(["report"], withLedger([sentToBrokerA]), { today: "2026-11-12" })).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+
+  it("lists a request the day after its due date and fails, so a scheduled job notices", async () => {
+    expect(await run(["report"], withLedger([sentToBrokerA]), { today: "2026-11-13" })).toEqual({
+      code: 1,
+      output: "broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue",
+    });
+  });
+
+  it("lists every overdue request, one line each", async () => {
+    const ledgerPath = withLedger([
+      sentToBrokerA,
+      { broker: "broker-b", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
+    ]);
+    expect(await run(["report"], ledgerPath, { today: "2026-11-13" })).toEqual({
+      code: 1,
+      output: [
+        "broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue",
+        "broker-b: sent 2026-10-01, due 2026-11-01, 12 days overdue",
+      ].join("\n"),
+    });
+  });
+
+  it("warns about a sent request with no due date and fails: it cannot be judged", async () => {
+    const ledgerPath = withLedger([{ broker: "broker-x", state: "sent", dates: { sent: "2026-09-01" } }]);
+    expect(await run(["report"], ledgerPath)).toEqual({ code: 1, output: "broker-x: sent 2026-09-01, no due date recorded" });
+  });
+
+  it("lists overdue requests first, then the requests it cannot judge", async () => {
+    const ledgerPath = withLedger([{ broker: "broker-x", state: "sent", dates: { sent: "2026-09-01" } }, sentToBrokerA]);
+    expect(await run(["report"], ledgerPath, { today: "2026-11-13" })).toEqual({
+      code: 1,
+      output: ["broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue", "broker-x: sent 2026-09-01, no due date recorded"].join(
+        "\n",
+      ),
+    });
+  });
+
+  it("says so when a hand-written entry has no sent date", async () => {
+    const ledgerPath = withLedger([{ broker: "broker-x", state: "sent", dates: {} }]);
+    expect(await run(["report"], ledgerPath)).toEqual({
+      code: 1,
+      output: "broker-x: sent (date not recorded), no due date recorded",
+    });
+  });
+
+  it("never lists acknowledged or drafted requests", async () => {
+    const ledgerPath = withLedger([
+      { broker: "answered", state: "acknowledged", dates: { sent: "2026-09-01", acknowledged: "2026-09-20", due: "2026-10-01" } },
+      { broker: "drafted", state: "drafted", dates: { drafted: "2026-09-01" } },
+    ]);
+    expect(await run(["report"], ledgerPath)).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+});
+
 describe("privacy-guard send", () => {
-  const withDraft = () => {
-    const ledgerPath = tmpLedger();
-    saveLedger(ledgerPath, { entries: [{ broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-12" } }] });
-    return ledgerPath;
-  };
+  const withDraft = () => withLedger([{ broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-12" } }]);
 
   it("without --confirm sends nothing and says so, even on an empty ledger", async () => {
     const { code, output } = await run(["send"]);

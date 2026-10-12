@@ -1,5 +1,14 @@
-// The privacy-guard command line: `due`, `draft`, `send`.
-import { DEFAULT_LEDGER_PATH, dueOn, loadLedger, openRequest, saveLedger } from "./ledger.ts";
+// The privacy-guard command line: `due`, `report`, `draft`, `send`.
+import {
+  DEFAULT_LEDGER_PATH,
+  type LedgerEntry,
+  dueOn,
+  loadLedger,
+  openRequest,
+  overdueOn,
+  saveLedger,
+  sentWithoutDueDate,
+} from "./ledger.ts";
 import { DEFAULT_BROKERS_DIR, loadPlaybooks } from "./playbook.ts";
 import { formatSubmission, renderFields } from "./render.ts";
 import { guardedSend } from "./send.ts";
@@ -15,7 +24,7 @@ export interface CliEnv {
   print: (line: string) => void;
 }
 
-const USAGE = "usage: privacy-guard <due | draft <broker> [--show] | send [--confirm]>";
+const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send [--confirm]>";
 
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
@@ -23,6 +32,8 @@ export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<
   switch (command) {
     case "due":
       return due(env);
+    case "report":
+      return report(env);
     case "draft": {
       const [broker] = flags.filter((arg) => !arg.startsWith("--"));
       if (broker === undefined) break;
@@ -43,6 +54,27 @@ function due(env: CliEnv): number {
   }
   for (const entry of entries) env.print(`${entry.broker}: ${entry.state}, due ${entry.dates.due}`);
   return 0;
+}
+
+// Exits 1 when anything needs the human, so a scheduled job notices.
+function report(env: CliEnv): number {
+  const ledger = loadLedger(env.ledgerPath);
+  // A hand-written ledger may lack the sent date; `loadLedger` does not require it.
+  const sent = (entry: LedgerEntry) => `sent ${entry.dates.sent ?? "(date not recorded)"}`;
+  const lines = [
+    ...overdueOn(ledger, env.today).map(
+      ({ entry, daysOverdue }) =>
+        `${entry.broker}: ${sent(entry)}, due ${entry.dates.due}, ${daysOverdue} ${daysOverdue === 1 ? "day" : "days"} overdue`,
+    ),
+    // Passing a request that cannot be judged silently would be a false green.
+    ...sentWithoutDueDate(ledger).map((entry) => `${entry.broker}: ${sent(entry)}, no due date recorded`),
+  ];
+  if (lines.length === 0) {
+    env.print("nothing is overdue");
+    return 0;
+  }
+  for (const line of lines) env.print(line);
+  return 1;
 }
 
 // Refuses before writing anything; the ledger gets broker and date only, never a rendered value.

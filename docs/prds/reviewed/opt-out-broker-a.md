@@ -947,7 +947,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   lines 25-27 ("finds the acknowledgement element" reads `playbook.reply.acknowledged_when.selector`;
   it becomes "finds the receipt element" reading `playbook.receipt.selector`). The assertions in
   `test/playbook.test.ts` lines 18-19 and 24 stay. Blocked by: none.
-- [ ] **2. Overdue derived; `report` command.** [#8](https://github.com/KenKor/privacy-guard/issues/8) Follows D-10, D-11. Remove `overdue` from `STATES`;
+- [x] **2. Overdue derived; `report` command.** [#8](https://github.com/KenKor/privacy-guard/issues/8) Follows D-10, D-11. Remove `overdue` from `STATES`;
   add an overdue query (state `sent`, due date set, `today > due`) and days overdue; add `report` with
   the output and exit codes in Commands, including the warning for a `sent` entry without a due date
   but not the line for a submission without a receipt, which needs `dates.submitted` and arrives with

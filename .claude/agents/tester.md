@@ -40,7 +40,7 @@ expect(isOverdue(request, today)).toBe(true);
 
 ## Test tiers in privacy-guard
 
-1. **Pure unit tests.** The request state machine (drafted, sent, acknowledged, overdue, escalated),
+1. **Pure unit tests.** The request state machine (drafted, sent, acknowledged, escalated; overdue is derived on every read, never stored),
    deadline arithmetic, template rendering, playbook parsing. No I/O. These always run and stay fast.
 2. **Fixture tests.** Run the playbook in `brokers/<name>.yaml` against a saved broker page in
    `test/fixtures/`. Prefer these over live tests: deterministic and offline. A fixture is a saved
@@ -53,7 +53,7 @@ expect(isOverdue(request, today)).toBe(true);
    test.skipIf(!live)("broker A form still has the fields the playbook targets", async () => { /* ... */ });
    ```
 4. **Send tests.** Never send a real request from a test. Sending is a separate, confirmed step and
-   the deny hook blocks it anyway. Test the send path against a local stub, in dry-run.
+   the deny hook blocks it anyway. Test the send path against a local stub (an injected `deliver`, or the local site on a free port), never a real broker.
 
 ## Build and run conventions
 

@@ -5,7 +5,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 export const DEFAULT_LEDGER_PATH = "ledger.json";
 
-export const STATES = ["drafted", "sent", "acknowledged", "overdue", "escalated"] as const;
+// Overdue is not a state: it is derived on every read (`overdueOn`), never stored.
+export const STATES = ["drafted", "sent", "acknowledged", "escalated"] as const;
 export type State = (typeof STATES)[number];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -82,4 +83,31 @@ export function dueOn(ledger: Ledger, today: string): LedgerEntry[] {
   return ledger.entries.filter(
     (entry) => entry.state !== "acknowledged" && entry.dates.due !== undefined && entry.dates.due <= today,
   );
+}
+
+export interface Overdue {
+  entry: LedgerEntry;
+  /** Calendar days from the due date to today; 1 on the day after the due date. */
+  daysOverdue: number;
+}
+
+/**
+ * Requests overdue on `today`: stored state `sent`, a due date, and `today` strictly after it.
+ * Derived on every read, never stored. A `sent` entry without a due date cannot be judged; see `sentWithoutDueDate`.
+ */
+export function overdueOn(ledger: Ledger, today: string): Overdue[] {
+  return ledger.entries.flatMap((entry) => {
+    const due = entry.dates.due;
+    return entry.state === "sent" && due !== undefined && today > due ? [{ entry, daysOverdue: daysBetween(due, today) }] : [];
+  });
+}
+
+/** `sent` requests with no due date recorded: neither overdue nor not, so `report` warns about them. */
+export function sentWithoutDueDate(ledger: Ledger): LedgerEntry[] {
+  return ledger.entries.filter((entry) => entry.state === "sent" && entry.dates.due === undefined);
+}
+
+// UTC midnights, so no daylight-saving shift can make a day 23 or 25 hours long.
+function daysBetween(from: string, to: string): number {
+  return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
 }

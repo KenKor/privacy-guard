@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Ledger, dueDate, dueOn, loadLedger, saveLedger } from "../src/ledger.ts";
+import { type Ledger, dueDate, dueOn, loadLedger, overdueOn, saveLedger, sentWithoutDueDate } from "../src/ledger.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "ledger-")), "ledger.json");
 
@@ -24,6 +24,14 @@ describe("ledger", () => {
     const path = tmpLedger();
     saveLedger(path, { entries: [{ broker: "broker-a", state: "lost" as never, dates: {} }] });
     expect(() => loadLedger(path)).toThrow(/state "lost" is not one of/);
+  });
+
+  it("rejects a stored overdue state: overdue is derived, never stored", () => {
+    const path = tmpLedger();
+    saveLedger(path, { entries: [{ broker: "broker-a", state: "overdue" as never, dates: {} }] });
+    expect(() => loadLedger(path)).toThrow(
+      `${path}: entry 0: state "overdue" is not one of drafted, sent, acknowledged, escalated`,
+    );
   });
 
   it("rejects an entry without dates, naming the file and the entry", () => {
@@ -49,7 +57,8 @@ describe("dueOn", () => {
   const ledger: Ledger = {
     entries: [
       { broker: "due-today", state: "sent", dates: { sent: "2026-09-12", due: "2026-10-12" } },
-      { broker: "past-due", state: "overdue", dates: { sent: "2026-08-01", due: "2026-09-01" } },
+      // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 2 (overdue is derived, not stored).
+      { broker: "past-due", state: "sent", dates: { sent: "2026-08-01", due: "2026-09-01" } },
       { broker: "due-later", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
       { broker: "answered", state: "acknowledged", dates: { sent: "2026-09-01", due: "2026-10-01" } },
       { broker: "no-date", state: "drafted", dates: { drafted: "2026-10-12" } },
@@ -62,6 +71,52 @@ describe("dueOn", () => {
 
   it("returns nothing for an empty ledger", () => {
     expect(dueOn({ entries: [] }, "2026-10-12")).toEqual([]);
+  });
+});
+
+describe("overdueOn", () => {
+  const sentToBrokerA = { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } } as const;
+  const brokers = (ledger: Ledger, today: string) => overdueOn(ledger, today).map(({ entry }) => entry.broker);
+
+  it("is not overdue on the due date itself", () => {
+    expect(overdueOn({ entries: [sentToBrokerA] }, "2026-11-12")).toEqual([]);
+  });
+
+  it("is overdue the day after the due date, by 1 day", () => {
+    expect(overdueOn({ entries: [sentToBrokerA] }, "2026-11-13")).toEqual([{ entry: sentToBrokerA, daysOverdue: 1 }]);
+  });
+
+  it("counts calendar days across month and year ends", () => {
+    expect(overdueOn({ entries: [sentToBrokerA] }, "2026-12-13")[0].daysOverdue).toBe(31);
+    expect(overdueOn({ entries: [sentToBrokerA] }, "2027-01-01")[0].daysOverdue).toBe(50);
+    const february = { ...sentToBrokerA, dates: { sent: "2028-01-31", due: "2028-02-29" } };
+    expect(overdueOn({ entries: [february] }, "2028-03-01")[0].daysOverdue).toBe(1);
+  });
+
+  it("only judges sent requests that have a due date", () => {
+    const ledger: Ledger = {
+      entries: [
+        sentToBrokerA,
+        { broker: "answered", state: "acknowledged", dates: { sent: "2026-09-01", acknowledged: "2026-09-20", due: "2026-10-01" } },
+        { broker: "drafted", state: "drafted", dates: { drafted: "2026-09-01", due: "2026-10-01" } },
+        { broker: "escalated", state: "escalated", dates: { sent: "2026-09-01", due: "2026-10-01" } },
+        { broker: "no-due", state: "sent", dates: { sent: "2026-09-01" } },
+      ],
+    };
+    expect(brokers(ledger, "2026-11-13")).toEqual(["broker-a"]);
+  });
+});
+
+describe("sentWithoutDueDate", () => {
+  it("returns sent requests that cannot be judged overdue because no due date is recorded", () => {
+    const ledger: Ledger = {
+      entries: [
+        { broker: "no-due", state: "sent", dates: { sent: "2026-09-01" } },
+        { broker: "with-due", state: "sent", dates: { sent: "2026-09-01", due: "2026-10-01" } },
+        { broker: "drafted", state: "drafted", dates: { drafted: "2026-09-01" } },
+      ],
+    };
+    expect(sentWithoutDueDate(ledger).map((e) => e.broker)).toEqual(["no-due"]);
   });
 });
 
