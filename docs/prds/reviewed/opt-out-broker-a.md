@@ -1011,7 +1011,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   succeeds; the "not implemented yet" case is replaced by a failure identified as pre-connection
   that leaves the entry `drafted`), and the `guardedSend` tests at lines 80-94 (their `SendRequest` gains the address and
   fields). Blocked by: 2, 3, 4, 5, 6.
-- [ ] **8. `reply`, `receipt` and `discard`.** [#14](https://github.com/KenKor/privacy-guard/issues/14) (`reply`), [#15](https://github.com/KenKor/privacy-guard/issues/15) (`receipt`, `discard`) Follows D-3, D-9, D-14, D-15. The commands with the
+- [x] **8. `reply`, `receipt` and `discard`.** [#14](https://github.com/KenKor/privacy-guard/issues/14) (`reply`), [#15](https://github.com/KenKor/privacy-guard/issues/15) (`receipt`, `discard`) Follows D-3, D-9, D-14, D-15. The commands with the
   refusals in Commands; usage line updated. Tests: `reply` takes the request out of `report`; `receipt` on a
   `drafted` entry with `dates.submitted` sets `sent`, takes the sent date from `dates.submitted` and
   the due date from it (2026-10-12 gives 2026-11-12), and takes it out of `report`; `receipt` refuses a

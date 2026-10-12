@@ -29,6 +29,12 @@ function withLedger(entries: LedgerEntry[]): string {
   return ledgerPath;
 }
 
+/** The entries in the ledger file at `ledgerPath`. */
+const entriesOf = (ledgerPath: string) => JSON.parse(readFileSync(ledgerPath, "utf8")).entries;
+
+/** A drafted request whose confirmed send got no receipt. */
+const submittedToBrokerA: LedgerEntry = { broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-10", submitted: "2026-10-12" } };
+
 async function run(
   argv: string[],
   ledgerPath = tmpLedger(),
@@ -447,7 +453,6 @@ describe("privacy-guard draft", () => {
 
 describe("privacy-guard reply", () => {
   const sentToBrokerA: LedgerEntry = { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } };
-  const entriesOf = (ledgerPath: string) => JSON.parse(readFileSync(ledgerPath, "utf8")).entries;
 
   it("marks a sent request acknowledged today by default", async () => {
     const ledgerPath = withLedger([sentToBrokerA]);
@@ -541,6 +546,150 @@ describe("privacy-guard reply", () => {
     expect(code).toBe(2);
     expect(output).toContain("reply <broker> [YYYY-MM-DD]");
     expect(entriesOf(ledgerPath)).toEqual([sentToBrokerA]);
+  });
+});
+
+describe("privacy-guard receipt", () => {
+  it("records a matching reference as sent from the submission date and takes it out of report", async () => {
+    const ledgerPath = withLedger([submittedToBrokerA]);
+    expect((await run(["report"], ledgerPath, { today: "2026-10-14" })).code).toBe(1);
+    expect(await run(["receipt", "broker-a", "BA-482915"], ledgerPath, { today: "2026-10-14" })).toEqual({
+      code: 0,
+      output: "recorded receipt BA-482915 for broker-a: sent 2026-10-12, due 2026-11-12",
+    });
+    expect(entriesOf(ledgerPath)).toEqual([
+      {
+        broker: "broker-a",
+        state: "sent",
+        reference: "BA-482915",
+        dates: { drafted: "2026-10-10", submitted: "2026-10-12", sent: "2026-10-12", due: "2026-11-12" },
+      },
+    ]);
+    expect(await run(["report"], ledgerPath, { today: "2026-10-14" })).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+
+  it("without a reference records sent with no reference, and report is quiet", async () => {
+    const ledgerPath = withLedger([submittedToBrokerA]);
+    expect(await run(["receipt", "broker-a"], ledgerPath, { today: "2026-10-13" })).toEqual({
+      code: 0,
+      output: "recorded broker-a as sent 2026-10-12, due 2026-11-12, no reference",
+    });
+    expect(entriesOf(ledgerPath)).toEqual([
+      { broker: "broker-a", state: "sent", dates: { drafted: "2026-10-10", submitted: "2026-10-12", sent: "2026-10-12", due: "2026-11-12" } },
+    ]);
+    expect(await run(["report"], ledgerPath, { today: "2026-10-13" })).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+
+  it.each([
+    ["no entry", [], "broker-a has no submission without a receipt: found no request"],
+    [
+      "a drafted entry with no submission",
+      [{ broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-10" } }],
+      "broker-a has no submission without a receipt: found drafted 2026-10-10, not submitted",
+    ],
+    [
+      "a sent entry",
+      [{ broker: "broker-a", state: "sent", reference: "BA-482915", dates: { sent: "2026-10-12", due: "2026-11-12" } }],
+      "broker-a has no submission without a receipt: found sent 2026-10-12",
+    ],
+  ] as [string, LedgerEntry[], string][])("refuses a broker with %s, naming what it found, and writes nothing", async (_, entries, message) => {
+    const ledgerPath = withLedger(entries);
+    expect(await run(["receipt", "broker-a", "BA-482915"], ledgerPath)).toEqual({ code: 1, output: message });
+    expect(entriesOf(ledgerPath)).toEqual(entries);
+  });
+
+  it("without a reference refuses a sent request too, and writes nothing", async () => {
+    const entries: LedgerEntry[] = [{ broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } }];
+    const ledgerPath = withLedger(entries);
+    expect(await run(["receipt", "broker-a"], ledgerPath)).toEqual({
+      code: 1,
+      output: "broker-a has no submission without a receipt: found sent 2026-10-12",
+    });
+    expect(entriesOf(ledgerPath)).toEqual(entries);
+  });
+
+  it.each(["BA-48291", "BA-4829150", "ba-482915"])("refuses the reference %s, naming the pattern, and writes nothing", async (reference) => {
+    const ledgerPath = withLedger([submittedToBrokerA]);
+    expect(await run(["receipt", "broker-a", reference], ledgerPath)).toEqual({
+      code: 1,
+      output: `reference "${reference}" does not match broker-a's reference pattern BA-[0-9]{6}`,
+    });
+    expect(entriesOf(ledgerPath)).toEqual([submittedToBrokerA]);
+  });
+
+  it("refuses a reference for a broker with no playbook", async () => {
+    const entries: LedgerEntry[] = [{ ...submittedToBrokerA, broker: "broker-z" }];
+    const ledgerPath = withLedger(entries);
+    expect(await run(["receipt", "broker-z", "BA-482915"], ledgerPath)).toEqual({ code: 1, output: "no playbook for broker-z in brokers" });
+    expect(entriesOf(ledgerPath)).toEqual(entries);
+  });
+
+  it.each([
+    ["without a broker", ["receipt"]],
+    ["with a flag", ["receipt", "broker-a", "--confirm"]],
+    ["with an argument after the reference", ["receipt", "broker-a", "BA-482915", "extra"]],
+  ])("%s prints usage naming receipt and writes nothing", async (_, argv) => {
+    const ledgerPath = withLedger([submittedToBrokerA]);
+    const { code, output } = await run(argv, ledgerPath);
+    expect(code).toBe(2);
+    expect(output).toContain("receipt <broker> [reference]");
+    expect(entriesOf(ledgerPath)).toEqual([submittedToBrokerA]);
+  });
+});
+
+describe("privacy-guard discard", () => {
+  it("removes the submission, prints it, takes it out of report, and lets draft work again", async () => {
+    const earlier: LedgerEntry = { broker: "broker-a", state: "acknowledged", dates: { sent: "2026-08-01", acknowledged: "2026-08-20" } };
+    const other: LedgerEntry = { broker: "broker-b", state: "drafted", dates: { drafted: "2026-10-11" } };
+    const ledgerPath = withLedger([earlier, submittedToBrokerA, other]);
+    expect(await run(["discard", "broker-a"], ledgerPath)).toEqual({ code: 0, output: "discarded broker-a: drafted 2026-10-10, submitted 2026-10-12" });
+    expect(entriesOf(ledgerPath)).toEqual([earlier, other]);
+    expect(await run(["report"], ledgerPath)).toEqual({ code: 0, output: "nothing is overdue" });
+    expect((await run(["draft", "broker-a"], ledgerPath)).code).toBe(0);
+  });
+
+  it("says so when a hand-written entry has no drafted date", async () => {
+    const ledgerPath = withLedger([{ broker: "broker-a", state: "drafted", dates: { submitted: "2026-10-12" } }]);
+    expect(await run(["discard", "broker-a"], ledgerPath)).toEqual({
+      code: 0,
+      output: "discarded broker-a: drafted (date not recorded), submitted 2026-10-12",
+    });
+    expect(entriesOf(ledgerPath)).toEqual([]);
+  });
+
+  it.each([
+    [
+      "a sent entry",
+      [{ broker: "broker-a", state: "sent", dates: { submitted: "2026-10-12", sent: "2026-10-12", due: "2026-11-12" } }],
+      "broker-a has no submission without a receipt: found sent 2026-10-12",
+    ],
+    [
+      "a drafted entry with no submission",
+      [{ broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-10" } }],
+      "broker-a has no submission without a receipt: found drafted 2026-10-10, not submitted",
+    ],
+    ["no entry", [], "broker-a has no submission without a receipt: found no request"],
+    [
+      "only an acknowledged entry",
+      [{ broker: "broker-a", state: "acknowledged", dates: { sent: "2026-08-01", acknowledged: "2026-08-20" } }],
+      "broker-a has no submission without a receipt: found acknowledged 2026-08-20",
+    ],
+  ] as [string, LedgerEntry[], string][])("refuses a broker with %s, naming which, and writes nothing", async (_, entries, message) => {
+    const ledgerPath = withLedger(entries);
+    expect(await run(["discard", "broker-a"], ledgerPath)).toEqual({ code: 1, output: message });
+    expect(entriesOf(ledgerPath)).toEqual(entries);
+  });
+
+  it.each([
+    ["without a broker", ["discard"]],
+    ["with a flag", ["discard", "--confirm"]],
+    ["with a second argument", ["discard", "broker-a", "broker-b"]],
+  ])("%s prints usage naming discard and writes nothing", async (_, argv) => {
+    const ledgerPath = withLedger([submittedToBrokerA]);
+    const { code, output } = await run(argv, ledgerPath);
+    expect(code).toBe(2);
+    expect(output).toContain("discard <broker>");
+    expect(entriesOf(ledgerPath)).toEqual([submittedToBrokerA]);
   });
 });
 

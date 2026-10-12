@@ -1,6 +1,7 @@
-// The privacy-guard command line: `due`, `report`, `draft`, `send`, `reply`.
+// The privacy-guard command line: `due`, `report`, `draft`, `send`, `reply`, `receipt`, `discard`.
 import {
   DEFAULT_LEDGER_PATH,
+  type Ledger,
   type LedgerEntry,
   dueOn,
   isCalendarDate,
@@ -43,7 +44,7 @@ export interface CliEnv {
 
 const SEND_FLAGS = ["--confirm", "--show"];
 
-const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send <broker> [--confirm] [--show] | reply <broker> [YYYY-MM-DD]>";
+const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send <broker> [--confirm] [--show] | reply <broker> [YYYY-MM-DD] | receipt <broker> [reference] | discard <broker>>";
 
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
@@ -75,6 +76,16 @@ export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<
       // reply takes no flags; a flag where the date goes is a mistyped command, not a bad date.
       if (broker === undefined || flags.length > 2 || flags.some((arg) => arg.startsWith("--"))) break;
       return reply(broker, date ?? env.today, env);
+    }
+    case "receipt": {
+      const [broker, reference] = flags;
+      if (broker === undefined || flags.length > 2 || flags.some((arg) => arg.startsWith("--"))) break;
+      return receipt(broker, reference, env);
+    }
+    case "discard": {
+      const [broker] = flags;
+      if (broker === undefined || flags.length > 1 || flags.some((arg) => arg.startsWith("--"))) break;
+      return discard(broker, env);
     }
   }
   env.print(USAGE);
@@ -146,9 +157,8 @@ function reply(broker: string, date: string, env: CliEnv): number {
   const ledger = loadLedger(env.ledgerPath);
   const open = openRequest(ledger, broker);
   if (open === undefined || (open.entry.state !== "sent" && open.entry.state !== "escalated")) {
-    // With no open request, name the broker's latest (acknowledged) entry, if any.
-    const latest = open?.entry ?? ledger.entries.filter((entry) => entry.broker === broker).at(-1);
-    env.print(`${broker} has no sent or escalated request: found ${latest === undefined ? "no request" : stateAndDate(latest)}`);
+    const found = foundInstead(ledger, broker, open?.entry);
+    env.print(`${broker} has no sent or escalated request: found ${found === undefined ? "no request" : stateAndDate(found)}`);
     return 1;
   }
   const { entry } = open;
@@ -162,6 +172,59 @@ function reply(broker: string, date: string, env: CliEnv): number {
   saveLedger(env.ledgerPath, ledger);
   env.print(`recorded ${broker} as acknowledged ${date}`);
   return 0;
+}
+
+// The human's word that a submission without a receipt arrived, with the reference from the broker's mail if any.
+// The request is sent from the submission date (D-16), so its due date never lies later than the law allows.
+function receipt(broker: string, reference: string | undefined, env: CliEnv): number {
+  if (reference !== undefined) {
+    const playbook = findPlaybook(broker, env);
+    if (playbook === undefined) return 1;
+    // The whole reference, not a match inside it: the human typed it, there is no page around it.
+    const pattern = playbook.receipt.reference_pattern;
+    if (!new RegExp(`^(?:${pattern})$`).test(reference)) {
+      env.print(`reference "${reference}" does not match ${broker}'s reference pattern ${pattern}`);
+      return 1;
+    }
+  }
+  const ledger = loadLedger(env.ledgerPath);
+  const entry = findSubmittedWithoutReceipt(ledger, broker, env);
+  if (entry === undefined) return 1;
+  recordSent(entry, reference, env.today);
+  saveLedger(env.ledgerPath, ledger);
+  env.print(
+    reference === undefined
+      ? `recorded ${broker} as sent ${entry.dates.sent}, due ${entry.dates.due}, no reference`
+      : `recorded receipt ${reference} for ${broker}: sent ${entry.dates.sent}, due ${entry.dates.due}`,
+  );
+  return 0;
+}
+
+// The human's word that a submission without a receipt did not arrive, or is withdrawn. The ledger forgets
+// it (D-15), so the broker has no open request and `draft` works again. Nothing is sent.
+function discard(broker: string, env: CliEnv): number {
+  const ledger = loadLedger(env.ledgerPath);
+  const entry = findSubmittedWithoutReceipt(ledger, broker, env);
+  if (entry === undefined) return 1;
+  ledger.entries.splice(ledger.entries.indexOf(entry), 1);
+  saveLedger(env.ledgerPath, ledger);
+  env.print(`discarded ${broker}: drafted ${entry.dates.drafted ?? "(date not recorded)"}, submitted ${entry.dates.submitted}`);
+  return 0;
+}
+
+// The broker's `drafted` entry with a submission that got no receipt; otherwise prints what it found instead.
+function findSubmittedWithoutReceipt(ledger: Ledger, broker: string, env: CliEnv): LedgerEntry | undefined {
+  const open = openRequest(ledger, broker)?.entry;
+  if (open?.state === "drafted" && open.dates.submitted !== undefined) return open;
+  const found = foundInstead(ledger, broker, open);
+  const what = found === undefined ? "no request" : `${stateAndDate(found)}${found.state === "drafted" ? ", not submitted" : ""}`;
+  env.print(`${broker} has no submission without a receipt: found ${what}`);
+  return undefined;
+}
+
+// What a refusal names: the broker's open request, or with none its latest (acknowledged) entry, if any.
+function foundInstead(ledger: Ledger, broker: string, open: LedgerEntry | undefined): LedgerEntry | undefined {
+  return open ?? ledger.entries.filter((entry) => entry.broker === broker).at(-1);
 }
 
 // "<state> <date>", the date the entry reached its state; the state alone when that date is not recorded.

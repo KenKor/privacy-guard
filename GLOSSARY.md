@@ -42,7 +42,7 @@ A send the human explicitly approved. Without that approval, privacy-guard only 
 _Avoid_: real send, live send
 
 **Submitted**:
-A drafted request whose confirmed send may have reached the broker but brought back no receipt. It stays drafted, keeps the date of its first such send, and stays in the report until the human resolves it.
+A drafted request whose confirmed send may have reached the broker but brought back no receipt. It stays drafted, keeps the date of its first such send, and stays in the report until the human resolves it: `receipt` (it arrived), `discard` (it did not, or is withdrawn), or a send that gets a receipt.
 _Avoid_: failed, pending, half-sent
 
 **Sent**:

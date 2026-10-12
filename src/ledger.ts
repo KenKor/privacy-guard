@@ -126,12 +126,13 @@ export function sentWithoutDueDate(ledger: Ledger): LedgerEntry[] {
 
 /**
  * Marks a request sent on a receipt. The sent date is the first submission's when there was one, as it
- * may be the one that arrived (D-16), else `today`; the due date follows from it.
+ * may be the one that arrived (D-16), else `today`; the due date follows from it. The reference is
+ * optional only on the human's word that it arrived without one (D-15).
  */
-export function recordSent(entry: LedgerEntry, reference: string, today: string): void {
+export function recordSent(entry: LedgerEntry, reference: string | undefined, today: string): void {
   const sent = entry.dates.submitted ?? today;
   entry.state = "sent";
-  entry.reference = reference;
+  if (reference !== undefined) entry.reference = reference;
   entry.dates.sent = sent;
   entry.dates.due = dueDate(sent);
 }
