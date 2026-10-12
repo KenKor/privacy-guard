@@ -224,7 +224,7 @@ subject value, with or without `--show`.
 
 | Command | Reads | Writes | Exit |
 |---|---|---|---|
-| `draft <broker> [--show]` | playbook, `subject.yaml`, ledger | new entry `{ broker, state: "drafted", dates: { drafted: today } }` | 0; 1 on refusal |
+| `draft <broker> [--show]` | playbook, `subject.yaml`, ledger | new entry `{ broker, state: "drafted", dates: { drafted: today } }` | 0; 1 on refusal; 2 without a broker |
 | `send <broker> [--confirm] [--show]` | ledger, playbook, `subject.yaml` | on a receipt: `state: "sent"`, `dates.sent`, `dates.due`, `reference`; on a submission without one: `dates.submitted` (D-14) | 0; 1 on refusal or no receipt; 2 without a broker |
 | `reply <broker> [YYYY-MM-DD]` | ledger | `state: "acknowledged"`, `dates.acknowledged` (default today) | 0; 1 on refusal |
 | `escalate <broker> [YYYY-MM-DD]` | ledger | `state: "escalated"`, `dates.escalated` (default today) on the broker's overdue `sent` entry | 0; 1 on refusal |
@@ -956,7 +956,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
 - [x] **3. Due date arithmetic.** [#9](https://github.com/KenKor/privacy-guard/issues/9) Follows D-6. `dueDate(sent)` in `src/ledger.ts` with the table in
   Due date and overdue as tests, including both leap and non-leap February; update the comment on
   `src/ledger.ts` line 3. Blocked by: none.
-- [ ] **4. Subject file, field rendering, `draft <broker>`.** [#10](https://github.com/KenKor/privacy-guard/issues/10) Follows D-5, D-7, D-8. `subject.example.yaml`
+- [x] **4. Subject file, field rendering, `draft <broker>`.** [#10](https://github.com/KenKor/privacy-guard/issues/10) Follows D-5, D-7, D-8. `subject.example.yaml`
   with the made-up subject; `subject.yaml` in `.gitignore`; the subject loader, refusing a non-string
   value; the renderer with `| optional`, `true` as `on`, `false` left out, and named failures; the
   masked printing with `--show`; `CliEnv` gains `brokersDir` and `subjectPath` (Test seams); `draft

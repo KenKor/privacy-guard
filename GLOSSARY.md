@@ -29,6 +29,10 @@ _Avoid_: method, transport
 One ask to one broker, on behalf of the subject, to erase their data and stop selling it.
 _Avoid_: opt-out (as a noun), ticket, case, entry
 
+**Open request**:
+A request with no reply yet: drafted, sent or escalated. A broker has at most one open request.
+_Avoid_: active, pending
+
 **Ledger**:
 The local record of every request and where it stands. It holds no personal data.
 _Avoid_: database, log, history

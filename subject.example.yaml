@@ -1,0 +1,7 @@
+# The subject: the person the requests are about. A made-up subject; tests use this file.
+# Copy it to subject.yaml (git-ignored) and fill in the real values. Quote every value:
+# an unquoted 0612345678 is read as a number and loses its leading zero.
+full_name: "Alex Example"
+email: "alex.example@example.org"
+phone: "+00 000 000 000"     # optional
+job_title: "Test Engineer"   # optional

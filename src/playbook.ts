@@ -4,6 +4,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 
+export const DEFAULT_BROKERS_DIR = "brokers";
+
 export const CHANNELS = ["web-form"] as const;
 export type Channel = (typeof CHANNELS)[number];
 

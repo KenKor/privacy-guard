@@ -70,6 +70,13 @@ function daysInMonth(year: number, month: number): number {
   return [4, 6, 9, 11].includes(month) ? 30 : 31;
 }
 
+/** The broker's open request (any state but `acknowledged`) and the date it reached that state, if any. */
+export function openRequest(ledger: Ledger, broker: string): { entry: LedgerEntry; date?: string } | undefined {
+  const entry = ledger.entries.find((candidate) => candidate.broker === broker && candidate.state !== "acknowledged");
+  if (entry === undefined) return undefined;
+  return { entry, date: (entry.dates as Record<string, string | undefined>)[entry.state] };
+}
+
 /** Entries still waiting on the broker whose due date is `today` or earlier. */
 export function dueOn(ledger: Ledger, today: string): LedgerEntry[] {
   return ledger.entries.filter(
