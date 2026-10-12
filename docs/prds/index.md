@@ -5,9 +5,8 @@
 ### new/ (0): untriaged intake
 
 
-### triaged/ (1): triaged, tracked as an issue
+### triaged/ (0): triaged, tracked as an issue
 
-- [opt-out-broker-a.md](triaged/opt-out-broker-a.md): Draft an opt-out request to broker A, wait for a confirmed send, and track the one-month deadline.
 
 ### research/ (0): spike in progress
 
@@ -15,8 +14,9 @@
 ### designed/ (0): written, decisions open
 
 
-### reviewed/ (0): decisions closed, ready to slice into tickets
+### reviewed/ (1): decisions closed, ready to slice into tickets
 
+- [opt-out-broker-a.md](reviewed/opt-out-broker-a.md) `0/10`: Ask broker A through its web form to erase the subject's data and stop selling it: `draft` the request, submit the form only on a confirmed send, record the receipt reference from broker A's thank-you page, record the reply by hand, and have `report` flag the request as overdue from the day after its due date (one calendar month after it was sent).
 
 ### implemented/ (0): all tickets closed, suite green, review and docs pending
 
