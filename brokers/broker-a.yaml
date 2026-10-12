@@ -1,0 +1,26 @@
+# Broker A: opt out by web form. Fictitious broker for the training sandbox.
+name: broker-a
+display_name: Broker A
+jurisdiction: EU
+legal_basis:
+  - gdpr-art-17   # right to erasure
+  - gdpr-art-21   # right to object
+channel: web-form
+form:
+  url: http://localhost:8080/
+  selector: "form#opt-out-form"
+  fields:
+    full_name: "{{ subject.full_name }}"
+    email: "{{ subject.email }}"
+    phone: "{{ subject.phone | optional }}"
+    job_title: "{{ subject.job_title | optional }}"
+    request_type: both
+    confirm_identity: true
+  submit: "button#submit_request"
+reply:
+  deadline: one-month     # GDPR Article 12(3)
+  acknowledged_when:
+    selector: "#thanks"
+    reference_pattern: "BA-[0-9]{6}"
+cadence: every-90-days    # brokers re-add people; ask again
+dry_run: true             # sending is a separate, confirmed step
