@@ -7,7 +7,7 @@ the request, submit the form only on a confirmed send, record the receipt refere
 thank-you page, record the reply by hand, and have `report` flag the request as overdue from the day
 after its due date (one calendar month after it was sent).
 
-**Status:** implemented, 2026-10-13. Written from a completed grilling session with the user, the
+**Status:** completed, 2026-10-13 (implemented the same day). Written from a completed grilling session with the user, the
 evidence in the repo, and the user's decisions in the review session that followed. All decisions
 are resolved (D-1 to D-17; D-17 is an amendment of 2026-10-12), and the PRD moved to `reviewed/` on
 the user's confirmation. Tickets published 2026-10-12 as #7 to #17 (sub-issues of #2); #7 to #16
@@ -17,8 +17,9 @@ is implemented and tested, and the suite, lint and link check pass. The notes ar
 document, not in the code: the background and Proposal still cite line numbers from the skeleton,
 D-4's "`dates.sent` today" was superseded by D-16 (`dates.submitted` when there is one), D-6 still
 gives the pre-D-17 example, and the code adds refusals (extra brokers and flags on `send`, unknown
-subject keys) that the PRD does not mention. One open defect is not recorded here: hospital #34 (a
-reused reference from broker A is taken as a receipt and starts the deadline). Code facts in the
+subject keys) that the PRD does not mention. Open defect, hospital #34 (a reused reference from
+broker A is taken as a receipt and starts the deadline): outside this PRD's plan, tracked as a
+follow-up of its own with this PRD as its origin; it does not hold the close-out. Code facts in the
 body were verified at `66295b1`.
 
 ## Purpose and background

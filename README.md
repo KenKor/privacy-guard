@@ -486,7 +486,7 @@ The `dates` object can also hold `submitted` (a confirmed send without a receipt
   (`ledger.json`) after each send. Issue #34 tracks this.
 
 The design decisions behind this behaviour are in the PRD,
-[docs/prds/implemented/opt-out-broker-a.md](docs/prds/implemented/opt-out-broker-a.md).
+[docs/prds/completed/opt-out-broker-a.md](docs/prds/completed/opt-out-broker-a.md).
 
 ## License
 
