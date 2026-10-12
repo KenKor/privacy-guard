@@ -9,8 +9,8 @@ after its due date (one calendar month after it was sent).
 
 **Status:** reviewed, 2026-10-12. Written from a completed grilling session with the user, the
 evidence in the repo, and the user's decisions in the review session that followed. All decisions
-are resolved (D-1 to D-16), and the PRD moved to `reviewed/` on the user's confirmation. Next:
-`/to-tickets`. Code facts verified at `66295b1`.
+are resolved (D-1 to D-16), and the PRD moved to `reviewed/` on the user's confirmation. Tickets
+published 2026-10-12 as #7 to #17 (sub-issues of #2). Code facts verified at `66295b1`.
 
 ## Purpose and background
 
@@ -927,7 +927,7 @@ Each item is one ticket, sized for one session. Items 2, 3, 4, 7 and 8 edit `src
 land beside them. The blocking edges below are the ones the design forces. An item that changes an
 existing assertion names it, which is the tester agent's authority once this PRD is in `reviewed/`.
 
-- [ ] **1. Playbook: `receipt`, validation, a stronger contract test.** Follows D-2, D-3, D-7. In
+- [ ] **1. Playbook: `receipt`, validation, a stronger contract test.** [#7](https://github.com/KenKor/privacy-guard/issues/7) Follows D-2, D-3, D-7. In
   `brokers/broker-a.yaml`, move `reply.acknowledged_when` to `receipt` as in Playbook above. In
   `src/playbook.ts`, `Playbook.receipt` replaces `reply.acknowledged_when`; `parsePlaybook` requires
   `receipt.selector` and `receipt.reference_pattern` for `channel: web-form`, requires the pattern to
@@ -942,7 +942,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   lines 25-27 ("finds the acknowledgement element" reads `playbook.reply.acknowledged_when.selector`;
   it becomes "finds the receipt element" reading `playbook.receipt.selector`). The assertions in
   `test/playbook.test.ts` lines 18-19 and 24 stay. Blocked by: none.
-- [ ] **2. Overdue derived; `report` command.** Follows D-10, D-11. Remove `overdue` from `STATES`;
+- [ ] **2. Overdue derived; `report` command.** [#8](https://github.com/KenKor/privacy-guard/issues/8) Follows D-10, D-11. Remove `overdue` from `STATES`;
   add an overdue query (state `sent`, due date set, `today > due`) and days overdue; add `report` with
   the output and exit codes in Commands, including the warning for a `sent` entry without a due date
   but not the line for a submission without a receipt, which needs `dates.submitted` and arrives with
@@ -953,10 +953,10 @@ existing assertion names it, which is the tester agent's authority once this PRD
   of "in dry-run". Assertion changed: `test/ledger.test.ts` line 52 (the `past-due` fixture's state
   `overdue` becomes `sent`; the `dueOn` expectation on line 60 stays). Works on a hand-written ledger.
   Blocked by: none.
-- [ ] **3. Due date arithmetic.** Follows D-6. `dueDate(sent)` in `src/ledger.ts` with the table in
+- [ ] **3. Due date arithmetic.** [#9](https://github.com/KenKor/privacy-guard/issues/9) Follows D-6. `dueDate(sent)` in `src/ledger.ts` with the table in
   Due date and overdue as tests, including both leap and non-leap February; update the comment on
   `src/ledger.ts` line 3. Blocked by: none.
-- [ ] **4. Subject file, field rendering, `draft <broker>`.** Follows D-5, D-7, D-8. `subject.example.yaml`
+- [ ] **4. Subject file, field rendering, `draft <broker>`.** [#10](https://github.com/KenKor/privacy-guard/issues/10) Follows D-5, D-7, D-8. `subject.example.yaml`
   with the made-up subject; `subject.yaml` in `.gitignore`; the subject loader, refusing a non-string
   value; the renderer with `| optional`, `true` as `on`, `false` left out, and named failures; the
   masked printing with `--show`; `CliEnv` gains `brokersDir` and `subjectPath` (Test seams); `draft
@@ -968,7 +968,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   confirmed-send line say the marker applies to an agent's tool calls (Guarding the send). Add
   **Open request** to GLOSSARY.md. Assertion changed: `test/cli.test.ts` lines 66-70 ("draft says it
   is not implemented yet"). Blocked by: 1.
-- [ ] **5. The local site answers the form's POST.** As in The local site. `sites/broker-a/server.ts`
+- [ ] **5. The local site answers the form's POST.** [#11](https://github.com/KenKor/privacy-guard/issues/11) As in The local site. `sites/broker-a/server.ts`
   (`startSite(port)`) and `sites/broker-a/main.ts`; `npm run site` runs `main.ts`; `sites` added to
   `tsconfig.json` `include`. `index.html` and the fixture do not change. Tests in
   `test/broker-a-site.test.ts`, with the server started in-process on a free port (an agent's `curl`
@@ -976,7 +976,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   returns 404; a valid POST returns 200 with a `BA-` reference that is not `BA-000000` and no
   `form#opt-out-form`; a POST missing `confirm_identity` returns 400 with no reference; the thank-you
   page carries the hidden notice. Blocked by: none.
-- [ ] **6. Harden the send hook.** Follows D-4, D-13. In `.claude/hooks/deny-outward-send.sh`: treat a
+- [ ] **6. Harden the send hook.** [#12](https://github.com/KenKor/privacy-guard/issues/12) Follows D-4, D-13. In `.claude/hooks/deny-outward-send.sh`: treat a
   send as outward however the CLI is run (`npx privacy-guard send`, `node bin/privacy-guard.js send`,
   `node src/cli.ts send`, `npm exec privacy-guard -- send`), and deny a tool call in which a send is
   not the only command: any `;`, `&`, `|`, newline, backtick or `$(` in a command line that contains a
@@ -985,7 +985,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   chained send (`... send --confirm broker-a; ... send --confirm broker-b`) and a send in a loop are
   denied even with the marker; the existing cases (lines 110-126) still pass. Run
   `.claude/hooks/deny-outward-send.sh --selftest`. Blocked by: none. Item 7 must not merge before it.
-- [ ] **7. `send <broker> --confirm` submits the form.** Follows D-4, D-6, D-13, D-14, D-16.
+- [ ] **7. `send <broker> --confirm` submits the form.** [#13](https://github.com/KenKor/privacy-guard/issues/13) Follows D-4, D-6, D-13, D-14, D-16.
   `send <broker> [--confirm] [--show]` with the refusals in Commands;
   `SendRequest` carries the address and rendered fields; `Deliver` returns the outcome; the HTTP
   `deliver` with `fetch`, form encoding, `redirect: "manual"`, the 10-second timeout and the 1 MB cap
@@ -1006,7 +1006,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   succeeds; the "not implemented yet" case is replaced by a failure identified as pre-connection
   that leaves the entry `drafted`), and the `guardedSend` tests at lines 80-94 (their `SendRequest` gains the address and
   fields). Blocked by: 2, 3, 4, 5, 6.
-- [ ] **8. `reply`, `receipt` and `discard`.** Follows D-3, D-9, D-14, D-15. The commands with the
+- [ ] **8. `reply`, `receipt` and `discard`.** [#14](https://github.com/KenKor/privacy-guard/issues/14) (`reply`), [#15](https://github.com/KenKor/privacy-guard/issues/15) (`receipt`, `discard`) Follows D-3, D-9, D-14, D-15. The commands with the
   refusals in Commands; usage line updated. Tests: `reply` takes the request out of `report`; `receipt` on a
   `drafted` entry with `dates.submitted` sets `sent`, takes the sent date from `dates.submitted` and
   the due date from it (2026-10-12 gives 2026-11-12), and takes it out of `report`; `receipt` refuses a
@@ -1016,7 +1016,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   `report`, and lets `draft` work again; it refuses a `sent` entry, a `drafted` entry with no
   submission, and a broker with no entry, naming which. `reply` needs only item 2 and can be sliced
   out ahead of item 7. Blocked by: 2, 7 (`receipt`, `discard`).
-- [ ] **9. `escalate`.** Follows D-1. `dates.escalated?` on `LedgerEntry` (the ISO-date check
+- [ ] **9. `escalate`.** [#16](https://github.com/KenKor/privacy-guard/issues/16) Follows D-1. `dates.escalated?` on `LedgerEntry` (the ISO-date check
   covers it). `escalate <broker> [YYYY-MM-DD]` as in Commands, with its refusals; `report` lists every
   `escalated` entry as "<broker>: escalated <date>, no reply" and exits 1 while one exists; `due`
   and `dueOn` stay unchanged. `GLOSSARY.md` gains **Escalated**. Usage line updated. Tests:
@@ -1025,10 +1025,10 @@ existing assertion names it, which is the tester agent's authority once this PRD
   broker with no entry, and a date after today, before `dates.sent` or malformed; `report` lists an
   escalated entry and exits 1; `reply` takes it out and `report` exits 0; `due` still lists it; a
   `sent` entry with no `reference` can be escalated. Blocked by: 2, 8.
-- [ ] **10. User docs.** README: setting up `subject.yaml` (values quoted), running `npm run site`,
+- [ ] **10. User docs.** [#17](https://github.com/KenKor/privacy-guard/issues/17) README: setting up `subject.yaml` (values quoted), running `npm run site`,
   the commands, `--show`, the confirmed send, what to do when a send gets no receipt (`receipt`, `discard`), running `report`
   on a schedule. For the `documenter`
-  agent once 1 to 8 are merged. Blocked by: 1 to 8.
+  agent once 1 to 9 are merged. Blocked by: 1 to 9.
 
 Test tiers: the unit tier in `test/` (`npm test`) covers items 1 to 8. The fixture tier stays for
 broker A: `test/broker-a-form.test.ts` against `test/fixtures/broker-a-form.html`, strengthened by item
