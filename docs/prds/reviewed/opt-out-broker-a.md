@@ -65,7 +65,7 @@ running.
 ```console
 $ privacy-guard draft broker-a
 POST http://localhost:8080/  (form#opt-out-form)
-  full_name         [subject.full_name]
+  name              [subject.full_name]
   email             [subject.email]
   phone             [subject.phone]
   job_title         [subject.job_title]
@@ -78,7 +78,7 @@ drafted a request to broker-a. Review it, then: privacy-guard send broker-a --co
 $ privacy-guard send broker-a --show       # dry run, values shown: contacts nothing
 dry run: nothing was sent. A real send needs --confirm.
 POST http://localhost:8080/  (form#opt-out-form)
-  full_name         Alex Example
+  name              Alex Example
   email             alex.example@example.org
   phone             +00 000 000 000
   job_title         Test Engineer
@@ -146,7 +146,7 @@ form:
   url: http://localhost:8080/
   selector: "form#opt-out-form"
   fields:
-    full_name: "{{ subject.full_name }}"
+    name: "{{ subject.full_name }}"
     email: "{{ subject.email }}"
     phone: "{{ subject.phone | optional }}"
     job_title: "{{ subject.job_title | optional }}"
@@ -408,7 +408,7 @@ requires.
 `npm run site` serves `sites/broker-a/index.html` on `localhost:8080` at `/` and `/index.html` (the
 hook's self-test fetches `/index.html`, "allow: curl GET of the fake broker page"), and answers a POST to `/`:
 
-- **Valid submission** (`full_name`, `email`, `request_type` and `confirm_identity` present and
+- **Valid submission** (`name`, `email`, `request_type` and `confirm_identity` present and
   non-empty, `request_type` one of the three options): 200 and a thank-you page without the form,
   whose `<p id="thanks">` holds `<strong id="reference">BA-NNNNNN</strong>`, six random digits from
   100000 to 999999, so never the `BA-000000` placeholder. The page carries the same hidden notice as

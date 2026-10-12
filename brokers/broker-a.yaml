@@ -10,7 +10,7 @@ form:
   url: http://localhost:8080/
   selector: "form#opt-out-form"
   fields:
-    full_name: "{{ subject.full_name }}"
+    name: "{{ subject.full_name }}"
     email: "{{ subject.email }}"
     phone: "{{ subject.phone | optional }}"
     job_title: "{{ subject.job_title | optional }}"

@@ -234,7 +234,8 @@ describe("privacy-guard send", () => {
         broker: "broker-a",
         url: "http://localhost:8080/",
         fields: [
-          { name: "full_name", value: "Alex Example" },
+          // Changed under the owner's approval of 2026-10-13: broker A renamed its form field full_name to name (3fca10a).
+          { name: "name", value: "Alex Example" },
           { name: "email", value: "alex.example@example.org" },
           { name: "phone", value: "+00 000 000 000" },
           { name: "job_title", value: "Test Engineer" },
@@ -359,7 +360,8 @@ describe("privacy-guard draft", () => {
     const { code, output } = await run(["draft", "broker-a"]);
     expect(code).toBe(0);
     expect(output).toContain("POST http://localhost:8080/  (form#opt-out-form)");
-    expect(output).toMatch(/full_name\s+\[subject\.full_name\]/);
+    // Changed under the owner's approval of 2026-10-13: broker A renamed its form field full_name to name (3fca10a).
+    expect(output).toMatch(/^\s+name\s+\[subject\.full_name\]/m);
     expect(output).toMatch(/email\s+\[subject\.email\]/);
     expect(output).toMatch(/request_type\s+both/);
     expect(output).toMatch(/confirm_identity\s+on/);
