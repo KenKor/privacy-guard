@@ -22,7 +22,43 @@ describe("broker-a playbook against the recorded form", () => {
     expect(form?.querySelector(playbook.form.submit)).not.toBeNull();
   });
 
-  it("finds the acknowledgement element", () => {
-    expect(page.querySelector(playbook.reply!.acknowledged_when!.selector!)).not.toBeNull();
+  it("finds the receipt element", () => {
+    expect(page.querySelector(playbook.receipt.selector)).not.toBeNull();
   });
+
+  it("posts to the playbook's address", () => {
+    // A missing or empty action posts to the page itself, as a browser does.
+    const withoutFragment = (url: URL) => Object.assign(url, { hash: "" }).href;
+    const action = new URL(form?.getAttribute("action") ?? "", playbook.form.url);
+    expect(withoutFragment(action)).toBe(withoutFragment(new URL(playbook.form.url)));
+  });
+
+  it.each(form?.querySelectorAll("[required]").map((control) => control.getAttribute("name")) ?? [])(
+    "has a playbook field for the required control %s",
+    (name) => {
+      expect(Object.keys(playbook.form.fields)).toContain(name);
+    },
+  );
+
+  const fieldsWithControl = (tag: string) =>
+    Object.entries(playbook.form.fields).filter(
+      ([field]) => form?.querySelector(`[name="${field}"]`)?.tagName === tag,
+    );
+
+  it.each(fieldsWithControl("SELECT"))("gives the select %s one of its option values", (field, value) => {
+    const options = form!
+      .querySelectorAll(`select[name="${field}"] option`)
+      .map((option) => option.getAttribute("value") ?? option.text.trim());
+    expect(options).toContain(value);
+  });
+
+  it.each(Object.entries(playbook.form.fields).filter(([, value]) => typeof value === "boolean"))(
+    "has a checkbox without a value attribute for the boolean field %s",
+    (field) => {
+      const control = form?.querySelector(`[name="${field}"]`);
+      expect(control?.tagName).toBe("INPUT");
+      expect(control?.getAttribute("type")).toBe("checkbox");
+      expect(control?.hasAttribute("value")).toBe(false);
+    },
+  );
 });

@@ -927,7 +927,7 @@ Each item is one ticket, sized for one session. Items 2, 3, 4, 7 and 8 edit `src
 land beside them. The blocking edges below are the ones the design forces. An item that changes an
 existing assertion names it, which is the tester agent's authority once this PRD is in `reviewed/`.
 
-- [ ] **1. Playbook: `receipt`, validation, a stronger contract test.** [#7](https://github.com/KenKor/privacy-guard/issues/7) Follows D-2, D-3, D-7. In
+- [x] **1. Playbook: `receipt`, validation, a stronger contract test.** [#7](https://github.com/KenKor/privacy-guard/issues/7) Follows D-2, D-3, D-7. In
   `brokers/broker-a.yaml`, move `reply.acknowledged_when` to `receipt` as in Playbook above. In
   `src/playbook.ts`, `Playbook.receipt` replaces `reply.acknowledged_when`; `parsePlaybook` requires
   `receipt.selector` and `receipt.reference_pattern` for `channel: web-form`, requires the pattern to

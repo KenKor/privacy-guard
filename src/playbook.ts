@@ -15,6 +15,13 @@ export interface WebForm {
   submit: string;
 }
 
+export interface Receipt {
+  /** The element on the broker's page that holds the reference. */
+  selector: string;
+  /** A regular expression that matches the reference, such as "BA-[0-9]{6}". */
+  reference_pattern: string;
+}
+
 export interface Playbook {
   name: string;
   display_name: string;
@@ -22,10 +29,9 @@ export interface Playbook {
   legal_basis?: string[];
   channel: Channel;
   form: WebForm;
-  reply?: {
-    deadline?: string;
-    acknowledged_when?: { selector?: string; reference_pattern?: string };
-  };
+  /** How the broker's receipt is found after a submission. A receipt is not a reply. */
+  receipt: Receipt;
+  reply?: { deadline?: string };
   cadence?: string;
   dry_run?: boolean;
 }
@@ -57,12 +63,35 @@ export function parsePlaybook(file: string, text: string): Playbook {
 
   const form = data.form;
   if (!isRecord(form)) return fail(`missing required field "form" for channel "${data.channel}"`);
-  for (const field of ["url", "selector", "submit"]) {
-    if (typeof form[field] !== "string") fail(`missing required field "form.${field}"`);
+  requireStrings(form, "form", ["url", "selector", "submit"], fail);
+  if (!isRecord(form.fields)) return fail(`missing required field "form.fields"`);
+  for (const [name, value] of Object.entries(form.fields)) {
+    if (typeof value !== "string" && typeof value !== "boolean") {
+      fail(`field "form.fields.${name}" must be a string or a boolean`);
+    }
   }
-  if (!isRecord(form.fields)) fail(`missing required field "form.fields"`);
+
+  const receipt = data.receipt;
+  if (!isRecord(receipt)) return fail(`missing required field "receipt" for channel "${data.channel}"`);
+  requireStrings(receipt, "receipt", ["selector", "reference_pattern"], fail);
+  try {
+    new RegExp(receipt.reference_pattern as string);
+  } catch {
+    fail(`field "receipt.reference_pattern" is not a valid regular expression`);
+  }
 
   return data as unknown as Playbook;
+}
+
+function requireStrings(
+  block: Record<string, unknown>,
+  prefix: string,
+  fields: string[],
+  fail: (message: string) => never,
+): void {
+  for (const field of fields) {
+    if (typeof block[field] !== "string") fail(`missing required field "${prefix}.${field}"`);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
