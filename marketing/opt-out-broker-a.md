@@ -1,7 +1,7 @@
 # Opt out of broker A: from draft to deadline
 
 Source: [docs/prds/completed/opt-out-broker-a.md](../docs/prds/completed/opt-out-broker-a.md)
-(issue #2). Claims below were checked against the code on `main` at `383f659` (`src/`, `bin/`,
+(issue #2). Claims below were checked against the code on `main` at `23e19ea` (`src/`, `bin/`,
 `brokers/broker-a.yaml`). privacy-guard is not legal advice, and nothing here is.
 
 Positioning follows the [README](../README.md): privacy-guard asks data brokers to erase a person's

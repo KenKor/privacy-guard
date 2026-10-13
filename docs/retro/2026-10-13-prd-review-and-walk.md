@@ -3,7 +3,7 @@
 Session: the `prd-reviewer` rounds and decision walk on `docs/prds/designed/opt-out-broker-a.md`
 (branch `prd/opt-out-broker-a`, PR #6), 2026-10-12. Log:
 the session log of 2026-10-12 (session `ca113933`, on the course author's machine).
-Files checked against the repo at `cf3aab7`. Candidates only; none is implemented. Ordered by severity.
+Files checked against the repo at `1980a58`. Candidates only; none is implemented. Ordered by severity.
 
 ## 1. The reviewer passed a false premise (D-2)
 

@@ -11,8 +11,8 @@ after its due date (one calendar month after it was sent).
 evidence in the repo, and the user's decisions in the review session that followed. All decisions
 are resolved (D-1 to D-17; D-17 is an amendment of 2026-10-12), and the PRD moved to `reviewed/` on
 the user's confirmation. Tickets published 2026-10-12 as #7 to #17 (sub-issues of #2); #7 to #16
-are closed, and #17 (user docs) is done in PR #37: the README, from the code at `383f659`. Post-implementation review
-(`prd-reviewer`, 2026-10-13, against `9840561`): **MATCHES WITH NOTES**. Every decision D-1 to D-17
+are closed, and #17 (user docs) is done in PR #37: the README, from the code at `23e19ea`. Post-implementation review
+(`prd-reviewer`, 2026-10-13, against `d7cb15b`): **MATCHES WITH NOTES**. Every decision D-1 to D-17
 is implemented and tested, and the suite, lint and link check pass. The notes are drift in this
 document, not in the code: the background and Proposal still cite line numbers from the skeleton,
 D-4's "`dates.sent` today" was superseded by D-16 (`dates.submitted` when there is one), D-6 still
@@ -20,7 +20,7 @@ gives the pre-D-17 example, and the code adds refusals (extra brokers and flags 
 subject keys) that the PRD does not mention. Open defect, hospital #34 (a reused reference from
 broker A is taken as a receipt and starts the deadline): outside this PRD's plan, tracked as a
 follow-up of its own with this PRD as its origin; it does not hold the close-out. Code facts in the
-body were verified at `66295b1`.
+body were verified at `72d0cf0`.
 
 ## Purpose and background
 
@@ -37,7 +37,7 @@ Requests sent by email or post are not accepted." (`sites/broker-a/index.html` l
 about the subject's own data (required). After a submission it shows a reference such as `BA-000000`
 in its thank-you element (lines 70-73).
 
-What the skeleton (`66295b1`) already has, and what this PRD builds on:
+What the skeleton (`72d0cf0`) already has, and what this PRD builds on:
 
 | Where | What is there now | What this PRD does with it |
 |---|---|---|
@@ -378,7 +378,7 @@ days from the due date to today (2026-11-12 to 2026-11-13: 1). Overdue is comput
 never stored, so `overdue` leaves `STATES`; `escalated` stays: `escalate` sets it on an overdue `sent`
 request (D-1), `report` lists it every day, and `reply` ends it. `acknowledged` ends the question.
 
-No code writes `overdue` today (grep at `66295b1`: the only stored use is the test fixture at
+No code writes `overdue` today (grep at `72d0cf0`: the only stored use is the test fixture at
 `test/ledger.test.ts` line 52). A hand-edited ledger that still holds it fails `loadLedger` with the
 existing message, which names the file, the entry and the allowed states (`src/ledger.ts` line 38).
 
@@ -999,7 +999,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   `email` fails naming `email` and no value; an unquoted number for `phone` is refused naming `phone`;
   an unknown placeholder fails naming it; `draft` output contains no subject value without `--show`
   and all of them with it. In review-checks, point "Use the made-up subject in `test/fixtures/`" at
-  `subject.example.yaml` (no such subject exists in `test/fixtures/` at `66295b1`), and make the
+  `subject.example.yaml` (no such subject exists in `test/fixtures/` at `72d0cf0`), and make the
   confirmed-send line say the marker applies to an agent's tool calls (Guarding the send). Add
   **Open request** to GLOSSARY.md. Assertion changed: `test/cli.test.ts` lines 66-70 ("draft says it
   is not implemented yet"). Blocked by: 1.
