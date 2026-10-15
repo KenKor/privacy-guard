@@ -7,7 +7,7 @@ PRD: docs/prds/reviewed/opt-out-broker-a.md (D-6)
 
 A broker has one calendar month from receiving a request to answer it (GDPR Article 12(3)), but
 privacy-guard cannot work out that date: today whoever writes a ledger entry sets `dates.due` by hand.
-The coming `send` and `receipt` work (#13, #17) records a due date from the sent date, so the rule for
+The coming `send` and `receipt` work (#13, #15) records a due date from the sent date, so the rule for
 it is settled and tested first, on its own (D-6).
 
 ## What Changes
@@ -36,5 +36,5 @@ None.
 - `src/ledger.ts`: a new exported due-date function and the updated header comment.
 - `test/ledger.test.ts`: tests for the six dates above.
 - No change to the CLI, the ledger format, `dueOn`, dependencies or other modules.
-- Out of scope: writing `dates.due` from `send` or `receipt` (#13, #17), and overdue as a derived
+- Out of scope: writing `dates.due` from `send` or `receipt` (#13, #15), and overdue as a derived
   state (D-10).

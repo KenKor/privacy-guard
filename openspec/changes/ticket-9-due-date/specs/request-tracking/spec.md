@@ -2,40 +2,45 @@
 
 ## ADDED Requirements
 
-### Requirement: Due date of a request
-The due date of a request SHALL be one calendar month after its sent date, on the same day of the
-month; when the target month has no such day, it SHALL be the last day of that month, never a day of
-the month after. It SHALL be worked out from the YYYY-MM-DD text of a real calendar date, with no time
-zone involved, and never as a count of days.
+### Requirement: Due date rule
+For a sent date, `dueDate` SHALL give the date one calendar month later, on the same day of the month;
+when the target month has no such day, the last day of that month, never a day of the month after. It
+SHALL work on the YYYY-MM-DD text of a real calendar date, with no time zone, and never count days. No
+command uses it yet, so it sets no request's due date.
 
 #### Scenario: Same day next month
-- **WHEN** a request is sent on 2026-10-12
-- **THEN** its due date is 2026-11-12
+- **WHEN** `dueDate` is given 2026-10-12
+- **THEN** it gives 2026-11-12
 - **Test**: `test/ledger.test.ts` › dueDate › "is one calendar month after the sent date"
 
 #### Scenario: Across the year end
-- **WHEN** a request is sent on 2026-12-15
-- **THEN** its due date is 2027-01-15
+- **WHEN** `dueDate` is given 2026-12-15
+- **THEN** it gives 2027-01-15
 - **Test**: `test/ledger.test.ts` › dueDate › "is one calendar month after the sent date"
 
 #### Scenario: End of January in a common year
-- **WHEN** a request is sent on 2026-01-31
-- **THEN** its due date is 2026-02-28
+- **WHEN** `dueDate` is given 2026-01-31
+- **THEN** it gives 2026-02-28
 - **Test**: `test/ledger.test.ts` › dueDate › "is the last day of the target month when it has no such day"
 
 #### Scenario: End of January in a leap year
-- **WHEN** a request is sent on 2028-01-31
-- **THEN** its due date is 2028-02-29
+- **WHEN** `dueDate` is given 2028-01-31
+- **THEN** it gives 2028-02-29
 - **Test**: `test/ledger.test.ts` › dueDate › "is the last day of the target month when it has no such day"
 
+#### Scenario: End of January in a century year that is not a leap year
+- **WHEN** `dueDate` is given 2100-01-31
+- **THEN** it gives 2100-02-28
+- **Test**: `test/ledger.test.ts` › dueDate › "does not make a century year a leap year unless it divides by 400"
+
 #### Scenario: Into a 30-day month
-- **WHEN** a request is sent on 2026-03-31 or on 2026-08-31
-- **THEN** its due date is 2026-04-30 or 2026-09-30
+- **WHEN** `dueDate` is given 2026-03-31 or 2026-08-31
+- **THEN** it gives 2026-04-30 or 2026-09-30
 - **Test**: `test/ledger.test.ts` › dueDate › "is the last day of the target month when it has no such day"
 
 #### Scenario: Not the machine's time zone
-- **WHEN** the due date of a request sent on 2026-10-12 is worked out on a machine whose time zone is behind or ahead of UTC
-- **THEN** it is 2026-11-12
+- **WHEN** `dueDate` is given 2026-10-12 on a machine whose time zone is behind or ahead of UTC
+- **THEN** it gives 2026-11-12
 - **Test**: `test/ledger.test.ts` › dueDate › "does not depend on the time zone"
 
 ## MODIFIED Requirements

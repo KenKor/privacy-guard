@@ -7,8 +7,9 @@ Test first (`/tdd`): each test is written and seen to fail before the code that 
 - [x] 1.1 In `test/ledger.test.ts`, add `describe("dueDate")` with "is one calendar month after the sent date" (2026-10-12 → 2026-11-12, 2026-12-15 → 2027-01-15); verify it fails because `dueDate` is not exported
 - [x] 1.2 Add `dueDate(sent: string): string` to `src/ledger.ts` with integer arithmetic on the string, no `Date` (design.md, Decisions); verify 1.1 passes
 - [x] 1.3 Add "is the last day of the target month when it has no such day" (2026-01-31 → 2026-02-28, 2028-01-31 → 2028-02-29, 2026-03-31 → 2026-04-30, 2026-08-31 → 2026-09-30); verify it fails before the clamp and passes after it
-- [x] 1.4 Add "does not depend on the time zone", which sets `process.env.TZ` to `America/Los_Angeles` and to `Pacific/Kiritimati`, expects 2026-11-12 for 2026-10-12 in both, and restores `TZ`; verify it passes
-- [x] 1.5 Replace the comment on line 3 of `src/ledger.ts` so it says `dueDate` works out the due date (one calendar month, clamped) and no command records one yet; verify by reading it against the delta spec's Request dates requirement
+- [x] 1.4 Add "does not make a century year a leap year unless it divides by 400" (2100-01-31 → 2100-02-28); verify it fails when the leap rule drops its century clause and passes with it
+- [x] 1.5 Add "does not depend on the time zone", which sets `process.env.TZ` to `America/Los_Angeles` and to `Pacific/Kiritimati`, expects 2026-11-12 for 2026-10-12 in both, and restores `TZ`; verify it passes
+- [x] 1.6 Replace the comment on line 3 of `src/ledger.ts` so it says `dueDate` works out the due date (one calendar month, clamped) and no command records one yet; verify by reading it against the delta spec's Request dates requirement
 
 ## 2. Whole change
 

@@ -12,10 +12,11 @@
 **Goals:**
 - One exported function, `dueDate(sent: string): string`, in `src/ledger.ts` (PRD plan item 3), that
   the later `send` and `receipt` tickets call.
-- Tests for the PRD's six dates, both leap and non-leap February, and a time-zone check.
+- Tests for the PRD's six dates, both leap and non-leap February, a century year that is not a leap
+  year (2100), and a time-zone check.
 
 **Non-Goals:**
-- Calling it from any command, or writing `dates.due` (#13, #17).
+- Calling it from any command, or writing `dates.due` (#13, #15).
 - Checking its input. Callers pass today's local date or a `dates.*` value that `loadLedger` has
   already checked for form; what it returns for a string that is not a real calendar date
   (`2026-13-45`) is not specified, and no test pins it.
@@ -43,6 +44,4 @@
 ## Risks / Trade-offs
 
 - [A hand-written month table can be wrong for one month] → the tests cover a 31-to-30 day step
-  (March, August), February in a common and a leap year, and the year rollover.
-- [The century rule (2100 is not a leap year) has no test from the PRD's table] → accepted: no request
-  sent this century reaches it; the rule is the standard one and costs one expression.
+  (March, August), February in a common, a leap and a century year (2100), and the year rollover.

@@ -78,6 +78,10 @@ describe("dueDate", () => {
     expect(dueDate("2026-08-31")).toBe("2026-09-30");
   });
 
+  it("does not make a century year a leap year unless it divides by 400", () => {
+    expect(dueDate("2100-01-31")).toBe("2100-02-28");
+  });
+
   it("does not depend on the time zone", () => {
     const tz = process.env.TZ;
     try {
