@@ -63,13 +63,18 @@ hold an `entries` array.
 
 ### Requirement: Ledger entries must be valid
 Loading SHALL fail on the first invalid entry, with an error naming the file and the entry's index, when
-the entry's state is not one of the five states, it has no `dates` object, or any of its dates is not a
+the entry's state is not one of the four states, it has no `dates` object, or any of its dates is not a
 string of the form YYYY-MM-DD. A `null` entry also fails, but with a plain TypeError that names neither.
 
 #### Scenario: Unknown state
 - **WHEN** an entry has state `lost`
 - **THEN** loading fails with an error containing `state "lost" is not one of`
 - **Test**: `test/ledger.test.ts` › ledger › "rejects an entry with an unknown state"
+
+#### Scenario: Stored overdue state is rejected
+- **WHEN** the first entry has state `overdue`
+- **THEN** loading fails with `<path>: entry 0: state "overdue" is not one of drafted, sent, acknowledged, escalated`
+- **Test**: `test/ledger.test.ts` › ledger › "rejects a stored overdue state"
 
 #### Scenario: No dates object
 - **WHEN** the first entry has no `dates` field
@@ -96,24 +101,69 @@ string of the form YYYY-MM-DD. A `null` entry also fails, but with a plain TypeE
 - **THEN** the ledger loads without error
 - **Test**: none (observed by running `due` on such a file)
 
-### Requirement: Request states
-A request SHALL be in exactly one of the states `drafted`, `sent`, `acknowledged`, `overdue` and
-`escalated`. A state is whatever the ledger file records: no command changes a state, and `overdue` is not
-worked out from the dates.
-
-#### Scenario: Stored overdue state is kept as written
-- **WHEN** an entry is stored as `overdue`
-- **THEN** it stays `overdue` and is reported as `overdue` by `due`
-- **Test**: `test/ledger.test.ts` › dueOn › "returns open entries due on or before today" (the `past-due` entry; only that it is due is asserted, not its state or the `due` output)
+### Requirement: Stored request states
+A request SHALL be in exactly one of the stored states `drafted`, `sent`, `acknowledged` and `escalated`.
+A state is whatever the ledger file records: no command changes a state. Overdue is not a state; it is
+worked out from a `sent` request's dates (see Overdue requests).
 
 #### Scenario: A sent request past its due date stays sent
 - **WHEN** an entry in state `sent` has a due date before today
-- **THEN** its state is still `sent`; nothing marks it `overdue`
+- **THEN** its state is still `sent`, and it is overdue without anything being written
 - **Test**: none
+
+#### Scenario: Overdue is not a stored state
+- **WHEN** an entry is stored as `overdue`
+- **THEN** the ledger does not load (see Ledger entries must be valid)
+- **Test**: `test/ledger.test.ts` › ledger › "rejects a stored overdue state"
+
+### Requirement: Overdue requests
+A request SHALL be overdue on a given day when its state is `sent`, it has a due date, and that day is
+strictly after the due date. Overdue SHALL be worked out from the state and dates every time it is read
+and never stored. A request in any other state is never overdue.
+
+#### Scenario: Not overdue on the due date
+- **WHEN** an entry in state `sent` is due 2026-11-12 and today is 2026-11-12
+- **THEN** it is not overdue
+- **Test**: `test/ledger.test.ts` › isOverdue › "is not overdue on its due date, and is the day after"
+
+#### Scenario: Overdue the day after
+- **WHEN** an entry in state `sent` is due 2026-11-12 and today is 2026-11-13
+- **THEN** it is overdue
+- **Test**: `test/ledger.test.ts` › isOverdue › "is not overdue on its due date, and is the day after"
+
+#### Scenario: Only sent requests are overdue
+- **WHEN** entries in state `drafted`, `acknowledged` and `escalated` each have a due date before today
+- **THEN** none of them is overdue
+- **Test**: `test/ledger.test.ts` › isOverdue › "never counts a drafted, acknowledged or escalated entry"
+
+#### Scenario: No due date
+- **WHEN** an entry in state `sent` has no due date
+- **THEN** it is not overdue
+- **Test**: `test/ledger.test.ts` › isOverdue › "does not count a sent entry without a due date"
+
+### Requirement: Days overdue
+Days overdue SHALL be the number of calendar days from the due date to today, so a request is 1 day
+overdue on the day after its due date. Dates are calendar dates; no time zone or time of day is involved.
+
+#### Scenario: One day
+- **WHEN** a `sent` entry is due 2026-11-12 and today is 2026-11-13
+- **THEN** it is 1 day overdue
+- **Test**: `test/ledger.test.ts` › daysOverdue › "counts calendar days from the due date"
+
+#### Scenario: Across a month end
+- **WHEN** a `sent` entry is due 2026-10-30 and today is 2026-11-02
+- **THEN** it is 3 days overdue
+- **Test**: `test/ledger.test.ts` › daysOverdue › "counts calendar days from the due date"
+
+#### Scenario: Across a daylight-saving change
+- **WHEN** a `sent` entry is due 2026-10-24 and today is 2026-10-26
+- **THEN** it is 2 days overdue, whatever the machine's time zone
+- **Test**: `test/ledger.test.ts` › daysOverdue › "counts calendar days from the due date"
 
 ### Requirement: Request dates
 Every value in an entry's `dates` SHALL be a string of the form YYYY-MM-DD, under any key name; no date is
-required, and whether it is a real calendar date is not checked. Commands read only `dates.due`.
+required, and whether it is a real calendar date is not checked. Commands read only `dates.due` and, in
+`report`, `dates.sent`.
 No command records a computed due date yet: the due date is whatever was recorded, and an entry without
 one is never due.
 
@@ -124,7 +174,7 @@ one is never due.
 
 #### Scenario: Sent date does not set a due date
 - **WHEN** an entry in state `sent` has a sent date and no due date
-- **THEN** no due date is derived from the sent date and the entry is never listed as due
+- **THEN** no due date is derived from the sent date, the entry is never listed as due, and it is never overdue
 - **Test**: none
 
 ### Requirement: Which requests are due
@@ -132,7 +182,7 @@ A request SHALL be due on a given day when it has a due date on or before that d
 `acknowledged`. Due dates are compared as YYYY-MM-DD text. Due requests SHALL be listed in ledger order.
 
 #### Scenario: Due today and past due
-- **WHEN** the ledger holds, in order, a `sent` entry due 2026-10-12, an `overdue` entry due 2026-09-01, a `sent` entry due 2026-11-01, an `acknowledged` entry due 2026-10-01 and a `drafted` entry with no due date, and today is 2026-10-12
+- **WHEN** the ledger holds, in order, a `sent` entry due 2026-10-12, a `sent` entry due 2026-09-01, a `sent` entry due 2026-11-01, an `acknowledged` entry due 2026-10-01 and a `drafted` entry with no due date, and today is 2026-10-12
 - **THEN** the due requests are the first two, in that order
 - **Test**: `test/ledger.test.ts` › dueOn › "returns open entries due on or before today"
 
@@ -165,6 +215,57 @@ A request SHALL be due on a given day when it has a due date on or before that d
 - **THEN** it uses the machine's local calendar date, not the UTC date
 - **Test**: none
 
+### Requirement: The report command
+`privacy-guard report` SHALL print, in ledger order, one line per overdue request,
+`<broker>: sent <sent date>, due <due date>, <n> day(s) overdue` (`day` when n is 1, else `days`), and a
+warning line `<broker>: sent <sent date>, no due date recorded` for each `sent` request without a due
+date. It SHALL exit 1 when it printed any line, else print `nothing is overdue` and exit 0.
+
+#### Scenario: Nothing overdue on an empty ledger
+- **WHEN** `report` runs on an empty ledger
+- **THEN** it prints exactly `nothing is overdue` and exits 0
+- **Test**: `test/cli.test.ts` › privacy-guard report › "says nothing is overdue on an empty ledger"
+
+#### Scenario: Due today is not yet overdue
+- **WHEN** `report` runs on 2026-11-12 with `broker-a` in state `sent`, sent 2026-10-12, due 2026-11-12
+- **THEN** it prints exactly `nothing is overdue` and exits 0
+- **Test**: `test/cli.test.ts` › privacy-guard report › "is quiet on the due date and flags the day after"
+
+#### Scenario: One overdue request
+- **WHEN** `report` runs on 2026-11-13 on the same ledger
+- **THEN** it prints exactly `broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue` and exits 1
+- **Test**: `test/cli.test.ts` › privacy-guard report › "is quiet on the due date and flags the day after"
+
+#### Scenario: Several days overdue
+- **WHEN** `report` runs on 2026-11-15 on a ledger holding that `broker-a` entry
+- **THEN** it prints `broker-a: sent 2026-10-12, due 2026-11-12, 3 days overdue` and exits 1
+- **Test**: `test/cli.test.ts` › privacy-guard report › "lists every overdue request in ledger order"
+
+#### Scenario: Sent without a due date
+- **WHEN** `report` runs with `broker-x` in state `sent`, sent 2026-09-01, with no due date, and nothing else
+- **THEN** it prints exactly `broker-x: sent 2026-09-01, no due date recorded` and exits 1
+- **Test**: `test/cli.test.ts` › privacy-guard report › "warns about a sent request with no due date"
+
+#### Scenario: Other states are not listed
+- **WHEN** `report` runs on a ledger whose only entries are a `drafted` and an `acknowledged` entry, each with a due date before today
+- **THEN** it prints exactly `nothing is overdue` and exits 0
+- **Test**: `test/cli.test.ts` › privacy-guard report › "never lists drafted or acknowledged requests"
+
+#### Scenario: Ledger order
+- **WHEN** `report` runs with, in order, an overdue `broker-b`, a `sent` `broker-x` with no due date and an overdue `broker-a`
+- **THEN** it prints three lines in that order and exits 1
+- **Test**: `test/cli.test.ts` › privacy-guard report › "lists every overdue request in ledger order"
+
+#### Scenario: No sent date recorded
+- **WHEN** an entry to be listed has no sent date
+- **THEN** its line omits the date: `<broker>: sent, due <due date>, <n> day(s) overdue`, or `<broker>: sent, no due date recorded`
+- **Test**: `test/cli.test.ts` › privacy-guard report › "leaves out a sent date that was not recorded"
+
+#### Scenario: Report changes nothing
+- **WHEN** `report` runs on a ledger with an overdue request
+- **THEN** the ledger file is unchanged and nothing is sent
+- **Test**: `test/cli.test.ts` › privacy-guard report › "is quiet on the due date and flags the day after" (asserts the ledger file is unchanged; that nothing is sent is not asserted, and `report` has no path to the send guard)
+
 ### Requirement: Invalid ledger stops a command
 A command that reads an invalid ledger SHALL stop with the load error and a non-zero exit code, and SHALL
 NOT send or print any request.
@@ -173,6 +274,11 @@ NOT send or print any request.
 - **WHEN** `due` runs and the ledger file holds `null`
 - **THEN** the process fails with the `expected an "entries" array` error and exits 1, printing a stack trace
 - **Test**: none
+
+#### Scenario: Report on a ledger with a stored overdue state
+- **WHEN** `report` runs and the ledger holds an entry in state `overdue`
+- **THEN** it fails with the unknown-state error and prints no request line
+- **Test**: `test/cli.test.ts` › privacy-guard report › "stops on a ledger that still stores overdue"
 
 ### Requirement: Send guard
 Every send SHALL be a dry run unless the human confirmed it. An unconfirmed send SHALL NOT reach a channel
@@ -204,7 +310,7 @@ drafted requests to send.` when there is none, and exit 0. It takes no broker ar
 - **Test**: `test/cli.test.ts` › privacy-guard send › "without --confirm names what it would send"
 
 #### Scenario: Only drafted requests are sent
-- **WHEN** `send` runs on a ledger whose entries are all `sent`, `acknowledged`, `overdue` or `escalated`
+- **WHEN** `send` runs on a ledger whose entries are all `sent`, `acknowledged` or `escalated`
 - **THEN** it names none of them and prints `no drafted requests to send.`
 - **Test**: none
 
@@ -243,8 +349,8 @@ escalation are not done yet, so every entry is written by hand.
 - **Test**: none
 
 ### Requirement: Command line surface
-The command line SHALL offer `due`, `draft` and `send`. `draft` SHALL print `draft is not implemented
-yet` and exit 0. Any other command, or none, SHALL print the usage line and exit 2.
+The command line SHALL offer `due`, `report`, `draft` and `send`. `draft` SHALL print `draft is not
+implemented yet` and exit 0. Any other command, or none, SHALL print the usage line and exit 2.
 
 #### Scenario: Draft is a stub
 - **WHEN** `draft` runs
@@ -253,7 +359,7 @@ yet` and exit 0. Any other command, or none, SHALL print the usage line and exit
 
 #### Scenario: Unknown command
 - **WHEN** `frobnicate` runs
-- **THEN** it prints `usage: privacy-guard <due | draft | send [--confirm]>` and exits 2
+- **THEN** it prints `usage: privacy-guard <due | report | draft | send [--confirm]>` and exits 2
 - **Test**: `test/cli.test.ts` › privacy-guard with an unknown command › "prints usage and fails" (asserts `usage: privacy-guard`, not the whole line)
 
 #### Scenario: No command
