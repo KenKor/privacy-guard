@@ -32,3 +32,5 @@ Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agen
 
 ## Docs
 `docs/agents/` (rules, deviations, review checks), `docs/prds/index.md` (generated).
+
+Background: [docs/background/personal-data.md](docs/background/personal-data.md) (what counts as personal data, and how to handle it).
