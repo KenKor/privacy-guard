@@ -85,8 +85,8 @@ export function dueDate(sent: string): string {
   const [dueYear, dueMonth] = month === 12 ? [year + 1, 1] : [year, month + 1];
   const lastDay = daysInMonth(dueYear, dueMonth);
   const due = new Date(Date.UTC(dueYear, dueMonth - 1, Math.min(day, lastDay)));
-  const weekendDays = { 6: 2, 0: 1 }[due.getUTCDay()] ?? 0;
-  due.setUTCDate(due.getUTCDate() + weekendDays);
+  const daysToMonday = { 6: 2, 0: 1 }[due.getUTCDay()] ?? 0; // Saturday +2, Sunday +1
+  due.setUTCDate(due.getUTCDate() + daysToMonday);
   return isoDate(due.getUTCFullYear(), due.getUTCMonth() + 1, due.getUTCDate());
 }
 
