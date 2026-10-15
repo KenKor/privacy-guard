@@ -1,5 +1,5 @@
-// The privacy-guard command line: `due`, `draft`, `send`.
-import { DEFAULT_LEDGER_PATH, dueOn, loadLedger } from "./ledger.ts";
+// The privacy-guard command line: `due`, `report`, `draft`, `send`.
+import { DEFAULT_LEDGER_PATH, daysOverdue, dueOn, isOverdue, loadLedger } from "./ledger.ts";
 import { guardedSend } from "./send.ts";
 
 export interface CliEnv {
@@ -9,7 +9,7 @@ export interface CliEnv {
   print: (line: string) => void;
 }
 
-const USAGE = "usage: privacy-guard <due | draft | send [--confirm]>";
+const USAGE = "usage: privacy-guard <due | report | draft | send [--confirm]>";
 
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
@@ -17,6 +17,8 @@ export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<
   switch (command) {
     case "due":
       return due(env);
+    case "report":
+      return report(env);
     case "draft":
       env.print("draft is not implemented yet");
       return 0;
@@ -35,6 +37,28 @@ function due(env: CliEnv): number {
     return 0;
   }
   for (const entry of entries) env.print(`${entry.broker}: ${entry.state}, due ${entry.dates.due}`);
+  return 0;
+}
+
+// Lists overdue requests and sent requests with no due date, in ledger order; exits 1 if it listed any,
+// so a scheduled job notices.
+function report(env: CliEnv): number {
+  let flagged = 0;
+  for (const entry of loadLedger(env.ledgerPath).entries) {
+    const due = entry.dates.due;
+    const sent = entry.dates.sent === undefined ? "sent" : `sent ${entry.dates.sent}`;
+    if (entry.state === "sent" && due === undefined) {
+      env.print(`${entry.broker}: ${sent}, no due date recorded`);
+    } else if (isOverdue(entry, env.today)) {
+      const days = daysOverdue(due as string, env.today);
+      env.print(`${entry.broker}: ${sent}, due ${due}, ${days} ${days === 1 ? "day" : "days"} overdue`);
+    } else {
+      continue;
+    }
+    flagged++;
+  }
+  if (flagged > 0) return 1;
+  env.print("nothing is overdue");
   return 0;
 }
 

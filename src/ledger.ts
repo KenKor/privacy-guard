@@ -5,7 +5,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 export const DEFAULT_LEDGER_PATH = "ledger.json";
 
-export const STATES = ["drafted", "sent", "acknowledged", "overdue", "escalated"] as const;
+// Overdue is not a state: it is worked out from a sent request's due date on every read (isOverdue).
+export const STATES = ["drafted", "sent", "acknowledged", "escalated"] as const;
 export type State = (typeof STATES)[number];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,4 +56,18 @@ export function dueOn(ledger: Ledger, today: string): LedgerEntry[] {
   return ledger.entries.filter(
     (entry) => entry.state !== "acknowledged" && entry.dates.due !== undefined && entry.dates.due <= today,
   );
+}
+
+/** A sent request is overdue from the day after its due date; on the due date itself it is not. */
+export function isOverdue(entry: LedgerEntry, today: string): boolean {
+  return entry.state === "sent" && entry.dates.due !== undefined && entry.dates.due < today;
+}
+
+/** Calendar days from `due` to `today` (2026-11-12 to 2026-11-13: 1). UTC, so no daylight-saving drift. */
+export function daysOverdue(due: string, today: string): number {
+  const utc = (date: string) => {
+    const [year, month, day] = date.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  return (utc(today) - utc(due)) / 86_400_000;
 }
