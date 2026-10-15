@@ -19,7 +19,7 @@ Test names are the ones the spec's **Test** lines cite. Work each group test-fir
 
 ## 4. Agent docs
 
-- [ ] 4.1 In `.claude/agents/tester.md` line 43, make the state machine "drafted, sent, acknowledged, escalated", naming overdue as derived from a `sent` request's due date; on line 56, replace "Test the send path against a local stub, in dry-run." with "Test the send path against a local stub (an injected `deliver`, or the local site on a free port), never a real broker."; verify by reading both lines against PRD plan item 2
+- [x] 4.1 In `.claude/agents/tester.md` line 43, make the state machine "drafted, sent, acknowledged, escalated", naming overdue as derived from a `sent` request's due date; on line 56, replace "Test the send path against a local stub, in dry-run." with "Test the send path against a local stub (an injected `deliver`, or the local site on a free port), never a real broker."; verify by reading both lines against PRD plan item 2
 
 ## 5. Check
 
