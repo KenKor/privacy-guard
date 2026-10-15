@@ -157,8 +157,9 @@ string of the form YYYY-MM-DD. A `null` entry also fails, but with a plain TypeE
 ### Requirement: Request dates
 Every value in an entry's `dates` SHALL be a string of the form YYYY-MM-DD, under any key name; no date is
 required, and whether it is a real calendar date is not checked. Commands read only `dates.due` and, in
-`report`, `dates.sent`. privacy-guard SHALL NOT compute a due date: the due date is whatever was recorded,
-and an entry without one is never due.
+`report`, `dates.sent`.
+No command records a computed due date yet: the due date is whatever was recorded, and an entry without
+one is never due.
 
 #### Scenario: No due date
 - **WHEN** an entry in state `drafted` has only a drafted date

@@ -47,6 +47,7 @@ None.
   really is in) before any command will read it. No code writes `overdue`, so only hand-edited ledgers
   are affected.
 - Out of scope: the `report` line for a submission without a receipt (needs `dates.submitted`, arrives
-  with the send ticket, plan item 7), the `report` line for an `escalated` request (arrives with
-  `escalate`, D-1), and computing the due date from the sent date (plan item 3). Until then `report`
-  says nothing about `drafted` or `escalated` entries.
+  with the send ticket, plan item 7) and the `report` line for an `escalated` request (arrives with
+  `escalate`, D-1). Until then `report` says nothing about `drafted` or `escalated` entries.
+- Not changed: the due-date rule (`dueDate`, ticket #9) already exists; `report` reads whatever due date
+  the entry records and does not compute one. Recording a computed due date is the send ticket's.

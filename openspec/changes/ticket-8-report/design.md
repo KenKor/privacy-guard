@@ -2,12 +2,12 @@
 
 ## Context
 
-`src/ledger.ts` holds `STATES` (line 8, with `overdue`), `loadLedger` (which rejects an unknown state
-naming file, entry and the allowed states, line 38) and `dueOn` (line 54). `src/cli.ts` dispatches
-`due`, `draft` and `send` from one `switch`, with `CliEnv` injecting `ledgerPath`, `today` (a local
-`YYYY-MM-DD` date) and `print`. No code writes `overdue`; its only stored use is the `past-due` fixture
-at `test/ledger.test.ts` line 52. See proposal.md for why; see specs/request-tracking/spec.md for the
-behaviour.
+`src/ledger.ts` holds `STATES` (with `overdue`), `loadLedger` (which rejects an unknown state naming
+file, entry and the allowed states), `dueDate` (one calendar month after a sent date, ticket #9) and
+`dueOn`. `src/cli.ts` dispatches `due`, `draft` and `send` from one `switch`, with `CliEnv` injecting
+`ledgerPath`, `today` (a local `YYYY-MM-DD` date) and `print`. No code writes `overdue`; its only stored
+use is the `past-due` fixture in `test/ledger.test.ts`. See proposal.md for why; see
+specs/request-tracking/spec.md for the behaviour.
 
 ## Goals / Non-Goals
 
@@ -17,7 +17,8 @@ behaviour.
 - `report` testable through `main` with an injected `today`, like `due`.
 
 **Non-Goals:**
-- Computing `dates.due` from `dates.sent` (plan item 3, `dueDate`).
+- Using `dueDate` in `report`: `report` judges the due date the entry records. Recording a computed due
+  date belongs to the send ticket.
 - `report` lines for a submission without a receipt (item 7) or for an `escalated` request (D-1).
 - Changing `due`, `dueOn`, or `send`.
 - Checking that a date is a real calendar date (the spec keeps "only the form is checked").
