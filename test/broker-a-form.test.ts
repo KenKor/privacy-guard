@@ -22,7 +22,7 @@ describe("broker-a playbook against the recorded form", () => {
     expect(form?.querySelector(playbook.form.submit)).not.toBeNull();
   });
 
-  it("finds the acknowledgement element", () => {
-    expect(page.querySelector(playbook.reply!.acknowledged_when!.selector!)).not.toBeNull();
+  it("finds the receipt element", () => {
+    expect(page.querySelector(playbook.receipt.selector)).not.toBeNull();
   });
 });

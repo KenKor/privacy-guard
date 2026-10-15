@@ -14,14 +14,14 @@
   "scripts": {
     "test": "vitest run",
     "lint": "tsc --noEmit",
-    "site": "python3 -m http.server 8080 --bind localhost --directory sites/broker-a"
+    "site": "node scripts/site.ts"
   },
   "dependencies": {
+    "node-html-parser": "^9.0.4",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "node-html-parser": "^9.0.4",
     "typescript": "^7.0.2",
     "vitest": "^5.0.4"
   }

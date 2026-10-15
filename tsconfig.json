@@ -13,5 +13,5 @@
     "checkJs": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "bin"]
+  "include": ["src", "test", "bin", "scripts"]
 }

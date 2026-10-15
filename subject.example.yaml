@@ -1,0 +1,7 @@
+# The subject: the person the requests are about. Copy this file to subject.yaml (git-ignored) and
+# fill in the real details there. This example is made up.
+# Quote every value: an unquoted 0612345678 would be read as a number and lose its leading zero.
+full_name: "Sam Example"            # required
+email: "sam.example@example.com"    # required
+phone: "0600000000"                 # optional
+job_title: "Example Analyst"        # optional

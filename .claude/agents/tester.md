@@ -40,8 +40,8 @@ expect(isOverdue(request, today)).toBe(true);
 
 ## Test tiers in privacy-guard
 
-1. **Pure unit tests.** The request state machine (drafted, sent, acknowledged, overdue, escalated),
-   deadline arithmetic, template rendering, playbook parsing. No I/O. These always run and stay fast.
+1. **Pure unit tests.** The request states (drafted, sent, acknowledged; overdue is derived from
+   the dates, never stored), deadline arithmetic, template rendering, playbook parsing. No I/O. These always run and stay fast.
 2. **Fixture tests.** Run the playbook in `brokers/<name>.yaml` against a saved broker page in
    `test/fixtures/`. Prefer these over live tests: deterministic and offline. A fixture is a saved
    copy of a real page with personal data replaced by placeholders. Never commit a fixture that
