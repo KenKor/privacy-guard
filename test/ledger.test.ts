@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Ledger, dueDate, dueOn, loadLedger, saveLedger } from "../src/ledger.ts";
+import { type Ledger, type LedgerEntry, daysOverdue, dueDate, dueOn, isOverdue, loadLedger, saveLedger } from "../src/ledger.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "ledger-")), "ledger.json");
 
@@ -24,6 +24,14 @@ describe("ledger", () => {
     const path = tmpLedger();
     saveLedger(path, { entries: [{ broker: "broker-a", state: "lost" as never, dates: {} }] });
     expect(() => loadLedger(path)).toThrow(/state "lost" is not one of/);
+  });
+
+  it("rejects a stored overdue state", () => {
+    const path = tmpLedger();
+    writeFileSync(path, JSON.stringify({ entries: [{ broker: "broker-a", state: "overdue", dates: {} }] }));
+    expect(() => loadLedger(path)).toThrow(
+      `${path}: entry 0: state "overdue" is not one of drafted, sent, acknowledged, escalated`,
+    );
   });
 
   it("rejects an entry without dates, naming the file and the entry", () => {
@@ -49,7 +57,8 @@ describe("dueOn", () => {
   const ledger: Ledger = {
     entries: [
       { broker: "due-today", state: "sent", dates: { sent: "2026-09-12", due: "2026-10-12" } },
-      { broker: "past-due", state: "overdue", dates: { sent: "2026-08-01", due: "2026-09-01" } },
+      // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 2 (overdue is derived, not stored).
+      { broker: "past-due", state: "sent", dates: { sent: "2026-08-01", due: "2026-09-01" } },
       { broker: "due-later", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
       { broker: "answered", state: "acknowledged", dates: { sent: "2026-09-01", due: "2026-10-01" } },
       { broker: "no-date", state: "drafted", dates: { drafted: "2026-10-12" } },
@@ -62,6 +71,34 @@ describe("dueOn", () => {
 
   it("returns nothing for an empty ledger", () => {
     expect(dueOn({ entries: [] }, "2026-10-12")).toEqual([]);
+  });
+});
+
+describe("isOverdue", () => {
+  const sent: LedgerEntry = { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } };
+
+  it("is not overdue on its due date, and is the day after", () => {
+    expect(isOverdue(sent, "2026-11-12")).toBe(false);
+    expect(isOverdue(sent, "2026-11-13")).toBe(true);
+  });
+
+  it("never counts a drafted, acknowledged or escalated entry", () => {
+    for (const state of ["drafted", "acknowledged", "escalated"] as const) {
+      expect(isOverdue({ ...sent, state }, "2026-12-01")).toBe(false);
+    }
+  });
+
+  it("does not count a sent entry without a due date", () => {
+    expect(isOverdue({ broker: "broker-x", state: "sent", dates: { sent: "2026-09-01" } }, "2026-12-01")).toBe(false);
+  });
+});
+
+describe("daysOverdue", () => {
+  it("counts calendar days from the due date", () => {
+    expect(daysOverdue("2026-11-12", "2026-11-13")).toBe(1);
+    expect(daysOverdue("2026-10-30", "2026-11-02")).toBe(3);
+    // Daylight saving ends in the EU on 2026-10-25; the count stays whole.
+    expect(daysOverdue("2026-10-24", "2026-10-26")).toBe(2);
   });
 });
 
