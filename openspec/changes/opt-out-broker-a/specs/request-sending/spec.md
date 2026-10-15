@@ -122,9 +122,14 @@ broker, it SHALL refuse.
 - **THEN** it refuses, makes no network request, and exits 1
 
 ### Requirement: Agent sends need the human's approval
-Any tool call by an agent that runs the CLI's `send` SHALL be blocked unless the command has
-`--confirm` and the human has created the one-shot approval marker. The marker SHALL be used up by
-the send it allows. This SHALL hold however the CLI is invoked.
+The outward-send hook SHALL block an agent tool call that runs the CLI's `send` in one of the
+ordinary ways, unless the command has `--confirm` and the human has created the one-shot approval
+marker. The marker SHALL be used up by the send it allows. The ordinary ways are `npx privacy-guard
+send`, `npm exec privacy-guard -- send`, `node bin/privacy-guard.js send`, `./bin/privacy-guard.js
+send`, a quoted path to the bin file, and a quoted `send`. The hook is a tripwire, not a wall: it
+reads one command line at a time, and an agent that sets out to evade it can do so. Examples are a
+version suffix such as `privacy-guard@0.1.0`, a command split across lines, or a script. The
+dry-run default and the human gate remain.
 
 #### Scenario: Invoked through the bin file
 - **WHEN** an agent runs `node bin/privacy-guard.js send broker-a --confirm` without the marker
@@ -132,6 +137,14 @@ the send it allows. This SHALL hold however the CLI is invoked.
 
 #### Scenario: Invoked by its path
 - **WHEN** an agent runs `./bin/privacy-guard.js send broker-a --confirm` without the marker
+- **THEN** the tool call is blocked
+
+#### Scenario: Invoked through npm exec
+- **WHEN** an agent runs `npm exec privacy-guard -- send broker-a --confirm` without the marker
+- **THEN** the tool call is blocked
+
+#### Scenario: Quoted send
+- **WHEN** an agent runs `node bin/privacy-guard.js "send" broker-a --confirm` without the marker
 - **THEN** the tool call is blocked
 
 #### Scenario: Approved once

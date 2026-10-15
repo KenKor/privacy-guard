@@ -77,9 +77,12 @@ today)` query that returns days overdue.
 yet, which contradicts the overdue rule. Removing `due` also changes the bin smoke test, which runs
 `due`.
 
-**Hook pattern.** It becomes `privacy-guard(\.js)?["']?[[:space:]]+send`, so it covers `npx
-privacy-guard send`, `node bin/privacy-guard.js send`, `./bin/privacy-guard.js send` and a quoted
-path. The selftest gains a case for each.
+**Hook pattern.** It becomes
+`privacy-guard(\.js)?["']?([[:space:]][^;|&]*)?[[:space:]]["']?send["']?([[:space:];|&]|$)`:
+privacy-guard or its bin file, then, within the same command, a bare or quoted `send` argument. It
+covers `npx privacy-guard send`, `npm exec privacy-guard -- send`, `node bin/privacy-guard.js
+send`, `./bin/privacy-guard.js send`, a quoted path and a quoted `send`. The selftest gains a case
+for each.
 
 **Local site: a Node server with no dependencies, in `scripts/site.ts`.** It runs with Node's type
 stripping, as `bin/` does, and listens on `localhost:8080`. `GET /` serves
@@ -101,8 +104,9 @@ contract test fixture stays identical to it.
   doesn't appear in the page as served by `GET`.
 - [Agents can't dry-run `send`] → The hook blocks every agent `send` without `--confirm`, including
   dry runs. Agents use `draft`, which prints the same submission. Unchanged from today.
-- [The hook is a tripwire, not a wall] → Agents can still evade it by sending from a script. It
-  remains one of several layers, as documented in the hook.
+- [The hook is a tripwire, not a wall] → Agents can still evade it by sending from a script, with a
+  version suffix (`npx privacy-guard@0.1.0 send`), or with a command split across lines, since it
+  reads one line at a time. It remains one of several layers, as documented in the hook.
 - [Weekend due dates] → No shift is applied, so a request can be flagged one or two days earlier
   than the strict EU rule (Regulation 1182/71) would allow, but never later.
 

@@ -27,8 +27,9 @@ and flag the request once the one-month deadline has passed without a reply.
 - Playbook: `reply.acknowledged_when` becomes a top-level `receipt { selector, reference_pattern }`,
   required for `web-form` playbooks.
 - Subject file: a git-ignored `subject.yaml` and a committed, made-up `subject.example.yaml`.
-- The outward-send hook catches every way of running the CLI's `send`, not only
-  `privacy-guard send`.
+- The outward-send hook catches the ordinary ways of running the CLI's `send` (through `npx`,
+  `npm exec` or the bin file, quoted or not), not only `privacy-guard send`. It stays a tripwire,
+  not a wall.
 - `npm run site` becomes a local server that answers broker A's form POST with a thank-you page and
   a fresh reference.
 
