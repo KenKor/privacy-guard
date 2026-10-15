@@ -13,8 +13,8 @@ including what it does not do yet, so that each ticket's change can show exactly
 
 - Adds a living spec for request tracking that describes the current behaviour of:
   - the ledger file (`src/ledger.ts`): where it lives, what an entry holds, how loading validates it;
-  - request states and dates: the five stored states and the four optional dates, with no transitions
-    and no due-date arithmetic;
+  - request states and dates: the five stored states and the YYYY-MM-DD dates, of which only the due
+    date is read, with no transitions and no due-date arithmetic;
   - the `due` command (`src/cli.ts`, `dueOn` in `src/ledger.ts`);
   - the send guard (`src/send.ts`) and the `send` command that uses it;
   - the command line around them: `draft` as a stub, usage on an unknown or missing command.

@@ -28,9 +28,9 @@ NOT create the file.
 - **Test**: none (`.gitignore` lists `ledger.json`)
 
 ### Requirement: Ledger entry
-Each ledger entry SHALL hold a broker name, a state and a set of dates; no other field is defined, so the
-ledger needs no personal data. Loading does not reject extra fields. Saving a ledger and loading it again
-SHALL give back the same entries.
+Loading SHALL accept an entry when it has a valid state and a `dates` object; nothing else about the
+entry is checked, and extra fields are kept. Commands read only an entry's `broker`, `state` and `dates`, so
+the ledger needs no personal data. Saving a ledger and loading it again SHALL give back the same entries.
 
 #### Scenario: Round trip
 - **WHEN** a ledger with an entry for `broker-a` in state `sent` with drafted, sent and due dates is saved and loaded
@@ -64,7 +64,7 @@ hold an `entries` array.
 ### Requirement: Ledger entries must be valid
 Loading SHALL fail on the first invalid entry, with an error naming the file and the entry's index, when
 the entry's state is not one of the five states, it has no `dates` object, or any of its dates is not a
-string of the form YYYY-MM-DD.
+string of the form YYYY-MM-DD. A `null` entry also fails, but with a plain TypeError that names neither.
 
 #### Scenario: Unknown state
 - **WHEN** an entry has state `lost`
@@ -86,8 +86,13 @@ string of the form YYYY-MM-DD.
 - **THEN** loading fails with an error naming `dates.due`
 - **Test**: none
 
+#### Scenario: Null entry
+- **WHEN** the ledger file contains `{"entries":[null]}`, or a `null` after a valid entry
+- **THEN** loading fails with `TypeError: Cannot read properties of null (reading 'state')`, naming neither the file nor the entry, and `due` exits 1
+- **Test**: none (observed by running `due` on such a file)
+
 #### Scenario: Only the form of a date is checked
-- **WHEN** an entry has `dates.due` set to `2026-13-45`, or a date under a name other than the four known ones
+- **WHEN** an entry has `dates.due` set to `2026-13-45`, or a date under a key such as `foo`
 - **THEN** the ledger loads without error
 - **Test**: none (observed by running `due` on such a file)
 
@@ -107,9 +112,10 @@ worked out from the dates.
 - **Test**: none
 
 ### Requirement: Request dates
-An entry's dates SHALL be optional ISO calendar dates named `drafted`, `sent`, `acknowledged` and `due`.
-privacy-guard SHALL NOT compute any date: the due date is whatever was recorded with the entry, and an
-entry without one is never due.
+Every value in an entry's `dates` SHALL be a string of the form YYYY-MM-DD, under any key name; no date is
+required, and whether it is a real calendar date is not checked. Commands read only `dates.due`.
+privacy-guard SHALL NOT compute any date: the due date is whatever was recorded, and an entry without one
+is never due.
 
 #### Scenario: No due date
 - **WHEN** an entry in state `drafted` has only a drafted date
