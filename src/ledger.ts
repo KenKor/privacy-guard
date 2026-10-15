@@ -1,6 +1,6 @@
 // The request ledger: one entry per request to a broker, kept in a local, git-ignored JSON file.
 // It holds only what tracking a request needs (broker, state, dates), no personal data.
-// dueDate works out the deadline (one calendar month from sending, clamped to the end of a shorter month);
+// dueDate works out the due date (one calendar month from sending, clamped to the end of a shorter month);
 // no command records it yet, so whoever records an entry sets its due date.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
