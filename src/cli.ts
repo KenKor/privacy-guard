@@ -108,9 +108,18 @@ async function send(broker: string, confirm: boolean, show: boolean, env: CliEnv
   const { outcome } = result;
   switch (outcome.kind) {
     case "receipt":
+      // The broker has the request now: print the reference first, so a failed save can't lose it.
       markSent(entry, outcome.reference, env.today);
-      saveLedger(env.ledgerPath, ledger);
       env.print(`sent to ${broker}: reference ${outcome.reference}, sent ${entry.dates.sent}, due ${entry.dates.due}`);
+      try {
+        saveLedger(env.ledgerPath, ledger);
+      } catch (error) {
+        env.print(
+          `but ${env.ledgerPath} could not be saved (${(error as Error).message}), so the ledger still says drafted. ` +
+            `Keep reference ${outcome.reference}: the request was sent on ${entry.dates.sent}, so do not send it again.`,
+        );
+        return 1;
+      }
       return 0;
     case "not-sent":
       env.print(`not sent to ${broker}: ${outcome.reason}. The request is still drafted.`);

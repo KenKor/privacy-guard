@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -175,6 +175,17 @@ describe("privacy-guard send", () => {
     expect(output).toContain("sent 2026-10-12");
     expect(output).toContain("due 2026-11-12");
     expectNoSubjectValue(readFileSync(ledgerPath, "utf8"));
+  });
+
+  it.skipIf(process.getuid?.() === 0)("prints the reference even when the ledger cannot be saved", async () => {
+    const ledgerPath = ledgerWith([drafted()]);
+    chmodSync(ledgerPath, 0o444);
+    const deliver = vi.fn(async (): Promise<DeliveryOutcome> => ({ kind: "receipt", reference: "BA-482915" }));
+    const { code, output } = await run(["send", "broker-a", "--confirm"], { ledgerPath, deliver });
+    expect(code).toBe(1);
+    expect(output).toMatch(/^sent to broker-a: reference BA-482915, sent 2026-10-12, due 2026-11-12/);
+    expect(output).toContain(`${ledgerPath} could not be saved`);
+    expect(output).toMatch(/keep reference BA-482915.*do not send it again/i);
   });
 
   it("with --confirm and a refused send leaves the request drafted", async () => {
