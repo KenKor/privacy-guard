@@ -76,14 +76,18 @@ export function recordReply(entry: LedgerEntry, date: string): void {
 
 /**
  * The due date for a request sent on `sent`: the same day one calendar month later, or that
- * month's last day when it has no such day (GDPR Article 12(3)). Weekends and holidays do not move
- * it. Works on the date's parts, so no time zone can shift the day.
+ * month's last day when it has no such day (GDPR Article 12(3)). A Saturday or Sunday moves to the
+ * following Monday (Regulation 1182/71, Article 3(4)); public holidays do not move it. Works on the
+ * date's parts in UTC, so no time zone can shift the day.
  */
 export function dueDate(sent: string): string {
   const [year, month, day] = sent.split("-").map(Number);
   const [dueYear, dueMonth] = month === 12 ? [year + 1, 1] : [year, month + 1];
   const lastDay = daysInMonth(dueYear, dueMonth);
-  return isoDate(dueYear, dueMonth, Math.min(day, lastDay));
+  const due = new Date(Date.UTC(dueYear, dueMonth - 1, Math.min(day, lastDay)));
+  const daysToMonday = { 6: 2, 0: 1 }[due.getUTCDay()] ?? 0; // Saturday +2, Sunday +1
+  due.setUTCDate(due.getUTCDate() + daysToMonday);
+  return isoDate(due.getUTCFullYear(), due.getUTCMonth() + 1, due.getUTCDate());
 }
 
 /** Sent requests whose due date has passed, with the days since: overdue from the day after the due date. */

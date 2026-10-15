@@ -106,7 +106,7 @@ describe("request lifecycle", () => {
       broker: "broker-a",
       state: "sent",
       reference: "BA-482915",
-      dates: { drafted: "2026-10-12", sent: "2027-01-31", due: "2027-02-28" },
+      dates: { drafted: "2026-10-12", sent: "2027-01-31", due: "2027-03-01" },
     });
   });
 
@@ -120,12 +120,14 @@ describe("request lifecycle", () => {
 describe("dueDate", () => {
   it.each([
     ["ordinary month", "2026-10-12", "2026-11-12"],
-    ["shorter next month", "2027-01-31", "2027-02-28"],
+    ["shorter next month", "2026-08-31", "2026-09-30"],
     ["leap year", "2028-01-30", "2028-02-29"],
     ["leap year, clamped", "2028-01-31", "2028-02-29"],
     ["year boundary", "2026-12-15", "2027-01-15"],
-    ["due date on a weekend (2026-11-14 is a Saturday)", "2026-10-14", "2026-11-14"],
-    ["30-day next month", "2026-08-31", "2026-09-30"],
+    ["due date on a Saturday (2026-11-14) moves to Monday", "2026-10-14", "2026-11-16"],
+    ["due date on a Sunday (2026-11-15) moves to Monday", "2026-10-15", "2026-11-16"],
+    ["clamped month end on a Sunday (2027-02-28) moves to Monday", "2027-01-31", "2027-03-01"],
+    ["public holiday (Christmas, a Friday) does not move it", "2026-11-25", "2026-12-25"],
   ])("%s: sent %s is due %s", (_, sent, due) => {
     expect(dueDate(sent)).toBe(due);
   });

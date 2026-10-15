@@ -268,6 +268,12 @@ describe("privacy-guard report", () => {
     expect(output).toContain("3 days overdue");
   });
 
+  it("keeps a weekend due date stored before weekends moved due dates", async () => {
+    const stored = sent("2026-10-14", "2026-11-14");
+    const { code, output } = await run(["report"], { ledgerPath: ledgerWith([stored]), today: "2026-11-15" });
+    expect({ code, output }).toEqual({ code: 1, output: "broker-a: sent 2026-10-14, due 2026-11-14, 1 day overdue" });
+  });
+
   it("lists a drafted request, not sent, and exits 0", async () => {
     const { code, output } = await run(["report"], { ledgerPath: ledgerWith([drafted()]), today: "2027-01-01" });
     expect({ code, output }).toEqual({ code: 0, output: "broker-a: drafted 2026-10-12, not sent" });

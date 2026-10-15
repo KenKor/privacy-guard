@@ -55,7 +55,7 @@ _Avoid_: submitted, delivered
 The date of the send that brought back the receipt; for a web form this is also the date the broker received it, and it starts the clock.
 
 **Due date**:
-One calendar month after the sent date (GDPR Article 12(3)), or the last day of that month when it has no such day. Weekends and public holidays do not move it.
+One calendar month after the sent date (GDPR Article 12(3)), or the last day of that month when it has no such day. A due date on a Saturday or Sunday moves to the following Monday; public holidays do not move it.
 _Avoid_: deadline date, 30 days
 
 **Overdue**:
