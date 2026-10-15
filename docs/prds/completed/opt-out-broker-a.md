@@ -22,6 +22,8 @@ broker A is taken as a receipt and starts the deadline): outside this PRD's plan
 follow-up of its own with this PRD as its origin; it does not hold the close-out. Code facts in the
 body were verified at `66295b1`.
 
+**ADRs:** D-1, D-4, D-13, D-14 with D-15, D-16 and D-17 are also recorded as ADRs 0001 to 0006 in [docs/adr/](../../adr/).
+
 ## Purpose and background
 
 privacy-guard asks data brokers to stop selling one person's data (GDPR Articles 17 and 21) and holds
