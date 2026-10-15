@@ -953,7 +953,7 @@ existing assertion names it, which is the tester agent's authority once this PRD
   of "in dry-run". Assertion changed: `test/ledger.test.ts` line 52 (the `past-due` fixture's state
   `overdue` becomes `sent`; the `dueOn` expectation on line 60 stays). Works on a hand-written ledger.
   Blocked by: none.
-- [ ] **3. Due date arithmetic.** [#9](https://github.com/KenKor/privacy-guard/issues/9) Follows D-6. `dueDate(sent)` in `src/ledger.ts` with the table in
+- [x] **3. Due date arithmetic.** [#9](https://github.com/KenKor/privacy-guard/issues/9) Follows D-6. `dueDate(sent)` in `src/ledger.ts` with the table in
   Due date and overdue as tests, including both leap and non-leap February; update the comment on
   `src/ledger.ts` line 3. Blocked by: none.
 - [ ] **4. Subject file, field rendering, `draft <broker>`.** [#10](https://github.com/KenKor/privacy-guard/issues/10) Follows D-5, D-7, D-8. `subject.example.yaml`
