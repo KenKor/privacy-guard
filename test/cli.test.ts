@@ -122,6 +122,7 @@ describe("privacy-guard send", () => {
     const { code, output } = await run(["send", "broker-a"], { ledgerPath, deliver });
     expect(code).toBe(0);
     expect(output).toMatch(/dry run: nothing was sent/i);
+    expect(output).toContain("A confirmed send needs --confirm");
     expect(output).toContain("[subject.email]");
     expectNoSubjectValue(output);
     expect(deliver).not.toHaveBeenCalled();
@@ -258,8 +259,14 @@ describe("privacy-guard report", () => {
 
   it("lists a drafted request, not sent, and exits 0", async () => {
     const { code, output } = await run(["report"], { ledgerPath: ledgerWith([drafted()]), today: "2027-01-01" });
-    expect(code).toBe(0);
-    expect(output).toContain("broker-a: drafted 2026-10-12, not sent");
+    expect({ code, output }).toEqual({ code: 0, output: "broker-a: drafted 2026-10-12, not sent" });
+  });
+
+  it("lists overdue and drafted requests together, without saying nothing is overdue", async () => {
+    const draftB: LedgerEntry = { ...drafted("2026-11-01"), broker: "broker-b" };
+    const { code, output } = await run(["report"], { ledgerPath: ledgerWith([sent(), draftB]), today: "2026-11-13" });
+    expect(code).toBe(1);
+    expect(output).toBe("broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue\nbroker-b: drafted 2026-11-01, not sent");
   });
 
   it("says nothing is overdue when every request is acknowledged or not yet due", async () => {

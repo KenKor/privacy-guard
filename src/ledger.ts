@@ -55,6 +55,25 @@ export function saveLedger(path: string, ledger: Ledger): void {
   writeFileSync(path, JSON.stringify(ledger, null, 2) + "\n");
 }
 
+/** The broker's first request in one of `states`. */
+export function findRequest(ledger: Ledger, broker: string, states: readonly State[]): LedgerEntry | undefined {
+  return ledger.entries.find((entry) => entry.broker === broker && states.includes(entry.state));
+}
+
+/** A receipt came back on `today`: the request is sent and its clock starts. */
+export function markSent(entry: LedgerEntry, reference: string, today: string): void {
+  entry.state = "sent";
+  entry.reference = reference;
+  entry.dates.sent = today;
+  entry.dates.due = dueDate(today);
+}
+
+/** The broker replied on `date`: the request is acknowledged and its clock stops. */
+export function recordReply(entry: LedgerEntry, date: string): void {
+  entry.state = "acknowledged";
+  entry.dates.replied = date;
+}
+
 /**
  * The due date for a request sent on `sent`: the same day one calendar month later, or that
  * month's last day when it has no such day (GDPR Article 12(3)). Weekends and holidays do not move

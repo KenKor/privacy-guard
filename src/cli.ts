@@ -1,5 +1,13 @@
 // The privacy-guard command line: `draft`, `send`, `reply`, `report`.
-import { DEFAULT_LEDGER_PATH, dueDate, type LedgerEntry, loadLedger, overdue, saveLedger } from "./ledger.ts";
+import {
+  DEFAULT_LEDGER_PATH,
+  findRequest,
+  loadLedger,
+  markSent,
+  overdue,
+  recordReply,
+  saveLedger,
+} from "./ledger.ts";
 import { loadPlaybooks, type Playbook } from "./playbook.ts";
 import { describeSubmission, renderFields } from "./render.ts";
 import { type Deliver, guardedSend } from "./send.ts";
@@ -66,7 +74,7 @@ function parseArgs(args: string[], allowedFlags: string[], maxExtra: number, nee
 function draft(broker: string, show: boolean, env: CliEnv): number {
   const playbook = findPlaybook(broker, env);
   const ledger = loadLedger(env.ledgerPath);
-  const open = ledger.entries.find((entry) => entry.broker === broker && entry.state !== "acknowledged");
+  const open = findRequest(ledger, broker, ["drafted", "sent"]);
   if (open) {
     const since = open.state === "sent" ? open.dates.sent : open.dates.drafted;
     env.print(`${broker} has a ${open.state} request from ${since}; a broker has one open request at a time.`);
@@ -84,7 +92,7 @@ function draft(broker: string, show: boolean, env: CliEnv): number {
 async function send(broker: string, confirm: boolean, show: boolean, env: CliEnv): Promise<number> {
   const playbook = findPlaybook(broker, env);
   const ledger = loadLedger(env.ledgerPath);
-  const entry = ledger.entries.find((e) => e.broker === broker && e.state === "drafted");
+  const entry = findRequest(ledger, broker, ["drafted"]);
   if (!entry) {
     env.print(`${broker} has no drafted request, so nothing was sent. Draft one with: privacy-guard draft ${broker}`);
     return 1;
@@ -92,7 +100,7 @@ async function send(broker: string, confirm: boolean, show: boolean, env: CliEnv
   const fields = renderFields(playbook.form.fields, loadSubject(env.subjectPath));
   const result = await guardedSend({ playbook, fields }, { confirm, deliver: env.deliver });
   if (result.dryRun) {
-    env.print("dry run: nothing was sent. A real send needs --confirm. It would send:");
+    env.print("dry run: nothing was sent. A confirmed send needs --confirm. It would send:");
     for (const line of describeSubmission(playbook, fields, show)) env.print(line);
     return 0;
   }
@@ -100,10 +108,7 @@ async function send(broker: string, confirm: boolean, show: boolean, env: CliEnv
   const { outcome } = result;
   switch (outcome.kind) {
     case "receipt":
-      entry.state = "sent";
-      entry.reference = outcome.reference;
-      entry.dates.sent = env.today;
-      entry.dates.due = dueDate(env.today);
+      markSent(entry, outcome.reference, env.today);
       saveLedger(env.ledgerPath, ledger);
       env.print(`sent to ${broker}: reference ${outcome.reference}, sent ${entry.dates.sent}, due ${entry.dates.due}`);
       return 0;
@@ -121,9 +126,9 @@ async function send(broker: string, confirm: boolean, show: boolean, env: CliEnv
 
 function reply(broker: string, date: string, env: CliEnv): number {
   const ledger = loadLedger(env.ledgerPath);
-  const entry = ledger.entries.find((e) => e.broker === broker && e.state === "sent");
+  const entry = findRequest(ledger, broker, ["sent"]);
   if (!entry) {
-    const isDrafted = ledger.entries.some((e) => e.broker === broker && e.state === "drafted");
+    const isDrafted = findRequest(ledger, broker, ["drafted"]) !== undefined;
     env.print(isDrafted ? `${broker}'s request was not sent: it is still drafted.` : `${broker} has no sent request.`);
     return 1;
   }
@@ -139,8 +144,7 @@ function reply(broker: string, date: string, env: CliEnv): number {
     env.print(`${date} is in the future.`);
     return 1;
   }
-  entry.state = "acknowledged";
-  entry.dates.replied = date;
+  recordReply(entry, date);
   saveLedger(env.ledgerPath, ledger);
   env.print(`${broker}: reply recorded on ${date}. The request is acknowledged.`);
   return 0;
@@ -148,14 +152,14 @@ function reply(broker: string, date: string, env: CliEnv): number {
 
 function report(env: CliEnv): number {
   const ledger = loadLedger(env.ledgerPath);
-  const late = overdue(ledger, env.today);
-  if (late.length === 0) env.print("nothing is overdue");
-  for (const { entry, days } of late) {
+  const overdueRequests = overdue(ledger, env.today);
+  const drafted = ledger.entries.filter((entry) => entry.state === "drafted");
+  if (overdueRequests.length === 0 && drafted.length === 0) env.print("nothing is overdue");
+  for (const { entry, days } of overdueRequests) {
     env.print(`${entry.broker}: sent ${entry.dates.sent}, due ${entry.dates.due}, ${days} ${days === 1 ? "day" : "days"} overdue`);
   }
-  const drafted = ledger.entries.filter((entry: LedgerEntry) => entry.state === "drafted");
   for (const entry of drafted) env.print(`${entry.broker}: drafted ${entry.dates.drafted}, not sent`);
-  return late.length > 0 ? 1 : 0;
+  return overdueRequests.length > 0 ? 1 : 0;
 }
 
 function findPlaybook(broker: string, env: CliEnv): Playbook {

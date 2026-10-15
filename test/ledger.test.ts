@@ -2,7 +2,16 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Ledger, dueDate, loadLedger, overdue, saveLedger } from "../src/ledger.ts";
+import {
+  type Ledger,
+  dueDate,
+  findRequest,
+  loadLedger,
+  markSent,
+  overdue,
+  recordReply,
+  saveLedger,
+} from "../src/ledger.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "ledger-")), "ledger.json");
 
@@ -72,6 +81,39 @@ describe("ledger", () => {
     const path = tmpLedger();
     writeFileSync(path, "{ entries: ");
     expect(() => loadLedger(path)).toThrow(`${path}: not valid JSON`);
+  });
+});
+
+describe("request lifecycle", () => {
+  const ledger = (): Ledger => ({
+    entries: [
+      { broker: "broker-a", state: "acknowledged", dates: { sent: "2026-08-01", due: "2026-09-01", replied: "2026-08-20" } },
+      { broker: "broker-a", state: "drafted", dates: { drafted: "2026-10-12" } },
+      { broker: "broker-b", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
+    ],
+  });
+
+  it("finds a broker's request in one of the given states", () => {
+    const l = ledger();
+    expect(findRequest(l, "broker-a", ["drafted", "sent"])).toBe(l.entries[1]);
+    expect(findRequest(l, "broker-b", ["drafted"])).toBeUndefined();
+  });
+
+  it("marks a request sent with its reference, sent date and due date", () => {
+    const entry = ledger().entries[1];
+    markSent(entry, "BA-482915", "2027-01-31");
+    expect(entry).toEqual({
+      broker: "broker-a",
+      state: "sent",
+      reference: "BA-482915",
+      dates: { drafted: "2026-10-12", sent: "2027-01-31", due: "2027-02-28" },
+    });
+  });
+
+  it("records a reply", () => {
+    const entry = ledger().entries[2];
+    recordReply(entry, "2026-10-20");
+    expect(entry).toMatchObject({ state: "acknowledged", dates: { replied: "2026-10-20" } });
   });
 });
 
