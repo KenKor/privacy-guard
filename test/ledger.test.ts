@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { type Ledger, dueOn, loadLedger, saveLedger } from "../src/ledger.ts";
+import { type Ledger, dueDate, dueOn, loadLedger, saveLedger } from "../src/ledger.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "ledger-")), "ledger.json");
 
@@ -62,5 +62,32 @@ describe("dueOn", () => {
 
   it("returns nothing for an empty ledger", () => {
     expect(dueOn({ entries: [] }, "2026-10-12")).toEqual([]);
+  });
+});
+
+describe("dueDate", () => {
+  it("is one calendar month after the sent date", () => {
+    expect(dueDate("2026-10-12")).toBe("2026-11-12");
+    expect(dueDate("2026-12-15")).toBe("2027-01-15");
+  });
+
+  it("is the last day of the target month when it has no such day", () => {
+    expect(dueDate("2026-01-31")).toBe("2026-02-28");
+    expect(dueDate("2028-01-31")).toBe("2028-02-29");
+    expect(dueDate("2026-03-31")).toBe("2026-04-30");
+    expect(dueDate("2026-08-31")).toBe("2026-09-30");
+  });
+
+  it("does not depend on the time zone", () => {
+    const tz = process.env.TZ;
+    try {
+      for (const zone of ["America/Los_Angeles", "Pacific/Kiritimati"]) {
+        process.env.TZ = zone;
+        expect(dueDate("2026-10-12")).toBe("2026-11-12");
+      }
+    } finally {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
   });
 });
