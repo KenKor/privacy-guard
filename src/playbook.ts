@@ -15,6 +15,13 @@ export interface WebForm {
   submit: string;
 }
 
+export interface Receipt {
+  /** CSS selector of the element in the broker's answer that holds the reference. */
+  selector: string;
+  /** Regular expression the reference matches. */
+  reference_pattern: string;
+}
+
 export interface Playbook {
   name: string;
   display_name: string;
@@ -22,10 +29,9 @@ export interface Playbook {
   legal_basis?: string[];
   channel: Channel;
   form: WebForm;
-  reply?: {
-    deadline?: string;
-    acknowledged_when?: { selector?: string; reference_pattern?: string };
-  };
+  /** Where the broker's answer to a submission carries its reference. Required for web-form. */
+  receipt: Receipt;
+  reply?: { deadline?: string };
   cadence?: string;
   dry_run?: boolean;
 }
@@ -60,7 +66,23 @@ export function parsePlaybook(file: string, text: string): Playbook {
   for (const field of ["url", "selector", "submit"]) {
     if (typeof form[field] !== "string") fail(`missing required field "form.${field}"`);
   }
-  if (!isRecord(form.fields)) fail(`missing required field "form.fields"`);
+  if (!isRecord(form.fields)) return fail(`missing required field "form.fields"`);
+  for (const [name, value] of Object.entries(form.fields)) {
+    if (typeof value !== "string" && typeof value !== "boolean") {
+      fail(`"form.fields.${name}" must be a string or a boolean`);
+    }
+  }
+
+  const receipt = data.receipt;
+  if (!isRecord(receipt)) return fail(`missing required field "receipt" for channel "${data.channel}"`);
+  for (const field of ["selector", "reference_pattern"]) {
+    if (typeof receipt[field] !== "string") fail(`missing required field "receipt.${field}"`);
+  }
+  try {
+    new RegExp(receipt.reference_pattern as string);
+  } catch {
+    fail(`"receipt.reference_pattern" is not a valid regular expression`);
+  }
 
   return data as unknown as Playbook;
 }

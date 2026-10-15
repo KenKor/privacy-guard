@@ -17,10 +17,10 @@ form:
     request_type: both
     confirm_identity: true
   submit: "button#submit_request"
+receipt:                  # where the answer to a submission carries the reference
+  selector: "#thanks"
+  reference_pattern: "BA-[0-9]{6}"
 reply:
   deadline: one-month     # GDPR Article 12(3)
-  acknowledged_when:
-    selector: "#thanks"
-    reference_pattern: "BA-[0-9]{6}"
 cadence: every-90-days    # brokers re-add people; ask again
 dry_run: true             # sending is a separate, confirmed step
