@@ -1,6 +1,6 @@
 // The request ledger: one entry per request to a broker, kept in a local, git-ignored JSON file.
 // It holds only what tracking a request needs (broker, state, dates), no personal data.
-// Deadline logic (one calendar month from sending) is not here yet; whoever records an entry sets its due date.
+// Computing the due date (one calendar month from sending) is not here yet; whoever records an entry sets it.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 export const DEFAULT_LEDGER_PATH = "ledger.json";

@@ -83,7 +83,7 @@ date. It SHALL exit 1 when it printed any line, else print `nothing is overdue` 
 - **Test**: `test/cli.test.ts` › privacy-guard report › "is quiet on the due date and flags the day after"
 
 #### Scenario: Several days overdue
-- **WHEN** `report` runs on 2026-11-15 on the same ledger
+- **WHEN** `report` runs on 2026-11-15 on a ledger holding that `broker-a` entry
 - **THEN** it prints `broker-a: sent 2026-10-12, due 2026-11-12, 3 days overdue` and exits 1
 - **Test**: `test/cli.test.ts` › privacy-guard report › "lists every overdue request in ledger order"
 
@@ -110,7 +110,7 @@ date. It SHALL exit 1 when it printed any line, else print `nothing is overdue` 
 #### Scenario: Report changes nothing
 - **WHEN** `report` runs on a ledger with an overdue request
 - **THEN** the ledger file is unchanged and nothing is sent
-- **Test**: `test/cli.test.ts` › privacy-guard report › "is quiet on the due date and flags the day after" (asserts the ledger file is unchanged)
+- **Test**: `test/cli.test.ts` › privacy-guard report › "is quiet on the due date and flags the day after" (asserts the ledger file is unchanged; that nothing is sent is not asserted, and `report` has no path to the send guard)
 
 ## MODIFIED Requirements
 

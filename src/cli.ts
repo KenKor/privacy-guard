@@ -45,13 +45,13 @@ function due(env: CliEnv): number {
 function report(env: CliEnv): number {
   let flagged = 0;
   for (const entry of loadLedger(env.ledgerPath).entries) {
-    const due = entry.dates.due;
-    const sent = entry.dates.sent === undefined ? "sent" : `sent ${entry.dates.sent}`;
-    if (entry.state === "sent" && due === undefined) {
-      env.print(`${entry.broker}: ${sent}, no due date recorded`);
+    const dueDate = entry.dates.due;
+    const sentPhrase = entry.dates.sent === undefined ? "sent" : `sent ${entry.dates.sent}`;
+    if (entry.state === "sent" && dueDate === undefined) {
+      env.print(`${entry.broker}: ${sentPhrase}, no due date recorded`);
     } else if (isOverdue(entry, env.today)) {
-      const days = daysOverdue(due as string, env.today);
-      env.print(`${entry.broker}: ${sent}, due ${due}, ${days} ${days === 1 ? "day" : "days"} overdue`);
+      const days = daysOverdue(dueDate as string, env.today);
+      env.print(`${entry.broker}: ${sentPhrase}, due ${dueDate}, ${days} ${days === 1 ? "day" : "days"} overdue`);
     } else {
       continue;
     }

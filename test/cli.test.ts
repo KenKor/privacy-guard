@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { main } from "../src/cli.ts";
-import { saveLedger } from "../src/ledger.ts";
+import { type LedgerEntry, saveLedger } from "../src/ledger.ts";
 import { guardedSend } from "../src/send.ts";
 
 const tmpLedger = () => join(mkdtempSync(join(tmpdir(), "cli-")), "ledger.json");
@@ -36,15 +36,20 @@ describe("privacy-guard due", () => {
 });
 
 describe("privacy-guard report", () => {
+  const withLedger = (entries: LedgerEntry[]) => {
+    const ledgerPath = tmpLedger();
+    saveLedger(ledgerPath, { entries });
+    return ledgerPath;
+  };
+  const sentA: LedgerEntry = { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } };
+  const noDueX: LedgerEntry = { broker: "broker-x", state: "sent", dates: { sent: "2026-09-01" } };
+
   it("says nothing is overdue on an empty ledger", async () => {
     expect(await run(["report"])).toEqual({ code: 0, output: "nothing is overdue" });
   });
 
   it("is quiet on the due date and flags the day after", async () => {
-    const ledgerPath = tmpLedger();
-    saveLedger(ledgerPath, {
-      entries: [{ broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } }],
-    });
+    const ledgerPath = withLedger([sentA]);
     const before = readFileSync(ledgerPath, "utf8");
     expect(await run(["report"], ledgerPath, "2026-11-12")).toEqual({ code: 0, output: "nothing is overdue" });
     expect(await run(["report"], ledgerPath, "2026-11-13")).toEqual({
@@ -55,24 +60,15 @@ describe("privacy-guard report", () => {
   });
 
   it("warns about a sent request with no due date", async () => {
-    const ledgerPath = tmpLedger();
-    saveLedger(ledgerPath, { entries: [{ broker: "broker-x", state: "sent", dates: { sent: "2026-09-01" } }] });
-    expect(await run(["report"], ledgerPath)).toEqual({
+    expect(await run(["report"], withLedger([noDueX]))).toEqual({
       code: 1,
       output: "broker-x: sent 2026-09-01, no due date recorded",
     });
   });
 
   it("lists every overdue request in ledger order", async () => {
-    const ledgerPath = tmpLedger();
-    saveLedger(ledgerPath, {
-      entries: [
-        { broker: "broker-b", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
-        { broker: "broker-x", state: "sent", dates: { sent: "2026-09-01" } },
-        { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } },
-      ],
-    });
-    expect(await run(["report"], ledgerPath, "2026-11-15")).toEqual({
+    const sentB: LedgerEntry = { broker: "broker-b", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } };
+    expect(await run(["report"], withLedger([sentB, noDueX, sentA]), "2026-11-15")).toEqual({
       code: 1,
       output: [
         "broker-b: sent 2026-10-01, due 2026-11-01, 14 days overdue",
@@ -83,13 +79,10 @@ describe("privacy-guard report", () => {
   });
 
   it("leaves out a sent date that was not recorded", async () => {
-    const ledgerPath = tmpLedger();
-    saveLedger(ledgerPath, {
-      entries: [
-        { broker: "broker-a", state: "sent", dates: { due: "2026-11-12" } },
-        { broker: "broker-x", state: "sent", dates: {} },
-      ],
-    });
+    const ledgerPath = withLedger([
+      { broker: "broker-a", state: "sent", dates: { due: "2026-11-12" } },
+      { broker: "broker-x", state: "sent", dates: {} },
+    ]);
     expect(await run(["report"], ledgerPath, "2026-11-13")).toEqual({
       code: 1,
       output: "broker-a: sent, due 2026-11-12, 1 day overdue\nbroker-x: sent, no due date recorded",
@@ -97,24 +90,18 @@ describe("privacy-guard report", () => {
   });
 
   it("never lists drafted or acknowledged requests", async () => {
-    const ledgerPath = tmpLedger();
-    saveLedger(ledgerPath, {
-      entries: [
-        { broker: "broker-a", state: "drafted", dates: { drafted: "2026-09-01", due: "2026-10-01" } },
-        { broker: "broker-b", state: "acknowledged", dates: { sent: "2026-09-01", due: "2026-10-01" } },
-      ],
-    });
+    const ledgerPath = withLedger([
+      { broker: "broker-a", state: "drafted", dates: { drafted: "2026-09-01", due: "2026-10-01" } },
+      { broker: "broker-b", state: "acknowledged", dates: { sent: "2026-09-01", due: "2026-10-01" } },
+    ]);
     expect(await run(["report"], ledgerPath)).toEqual({ code: 0, output: "nothing is overdue" });
   });
 
   it("stops on a ledger that still stores overdue", async () => {
-    const ledgerPath = tmpLedger();
-    writeFileSync(
-      ledgerPath,
-      JSON.stringify({ entries: [{ broker: "broker-a", state: "overdue", dates: { sent: "2026-08-01", due: "2026-09-01" } }] }),
-    );
+    const ledgerPath = withLedger([{ ...sentA, state: "overdue" as never }]);
+    // Calls main directly: run would lose what was printed before the load error.
     const lines: string[] = [];
-    await expect(main(["report"], { ledgerPath, today: "2026-10-12", print: (line) => lines.push(line) })).rejects.toThrow(
+    await expect(main(["report"], { ledgerPath, today: "2026-11-13", print: (line) => lines.push(line) })).rejects.toThrow(
       `${ledgerPath}: entry 0: state "overdue" is not one of drafted, sent, acknowledged, escalated`,
     );
     expect(lines).toEqual([]);

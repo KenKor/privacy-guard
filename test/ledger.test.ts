@@ -57,6 +57,7 @@ describe("dueOn", () => {
   const ledger: Ledger = {
     entries: [
       { broker: "due-today", state: "sent", dates: { sent: "2026-09-12", due: "2026-10-12" } },
+      // Changed under docs/prds/reviewed/opt-out-broker-a.md, plan item 2 (overdue is derived, not stored).
       { broker: "past-due", state: "sent", dates: { sent: "2026-08-01", due: "2026-09-01" } },
       { broker: "due-later", state: "sent", dates: { sent: "2026-10-01", due: "2026-11-01" } },
       { broker: "answered", state: "acknowledged", dates: { sent: "2026-09-01", due: "2026-10-01" } },
