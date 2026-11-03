@@ -8,6 +8,7 @@ import {
   isCalendarDate,
   isOverdue,
   loadLedger,
+  oldLedgerInstead,
   openRequest,
   overdueOn,
   recordSent,
@@ -51,6 +52,11 @@ const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | se
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
   const [command, ...flags] = argv;
+  const old = oldLedgerInstead(env.ledgerPath);
+  if (old !== undefined) {
+    env.print(`found ${old}, the ledger's old name. Rename it to ${env.ledgerPath}, then run the command again. Nothing was changed.`);
+    return 1;
+  }
   switch (command) {
     case "due":
       return due(env);
