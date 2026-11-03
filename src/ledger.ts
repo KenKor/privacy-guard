@@ -6,7 +6,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 export const DEFAULT_LEDGER_PATH = "privacy-guard-ledger.json";
-/** The ledger's name before 0.2.0. */
+/** The ledger's name in unreleased builds, before the first release. */
 export const OLD_LEDGER_NAME = "ledger.json";
 
 /**
