@@ -29,6 +29,12 @@ Single-context: one `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agen
 | `pr-reviewer` (+ correctness, perf-memory, reuse) | the merge gate |
 | `healer` / `tester` | red tests; assertion changes under authority |
 | `documenter` / `marketeer` | user docs; business case, when asked |
+| `release-classifier` | the release label, flags and release note of one PR or issue (`/release classify <n>`) |
+| `release-manager` | the release role: `/release status`, `notes`, `docs`, `candidate` |
+
+## Release management
+Phase 0 (shadow): labels are recorded, nothing is restricted. Settings and the supported contract:
+`docs/agents/release.md`. Pull requests for the release add-on go into the `release` branch.
 
 ## Docs
 `docs/agents/` (rules, deviations, review checks), `docs/prds/index.md` (generated).
