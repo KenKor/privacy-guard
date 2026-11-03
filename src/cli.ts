@@ -47,7 +47,7 @@ export interface CliEnv {
 
 const SEND_FLAGS = ["--confirm", "--show"];
 
-const USAGE = "usage: privacy-guard <due | report | draft <broker> [--show] | send <broker> [--confirm] [--show] | reply <broker> [YYYY-MM-DD] | escalate <broker> [YYYY-MM-DD] | receipt <broker> [reference] | discard <broker>>";
+const USAGE = "usage: privacy-guard <due | report [--json] | draft <broker> [--show] | send <broker> [--confirm] [--show] | reply <broker> [YYYY-MM-DD] | escalate <broker> [YYYY-MM-DD] | receipt <broker> [reference] | discard <broker>>";
 
 /** Runs one command and returns the process exit code. */
 export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<number> {
@@ -61,7 +61,7 @@ export async function main(argv: string[], env: CliEnv = defaultEnv()): Promise<
     case "due":
       return due(env);
     case "report":
-      return report(env);
+      return report(env, flags.includes("--json"));
     case "draft": {
       const [broker] = flags.filter((arg) => !arg.startsWith("--"));
       if (broker === undefined) break;
@@ -111,28 +111,36 @@ function due(env: CliEnv): number {
   return 0;
 }
 
-// Exits 1 when anything needs the human, so a scheduled job notices.
-function report(env: CliEnv): number {
+// Exits 1 when anything needs the human, so a scheduled job notices. With --json, prints one JSON array
+// of the same findings ({ broker, line }) for a script, and the same exit code.
+function report(env: CliEnv, json = false): number {
   const ledger = loadLedger(env.ledgerPath);
   // A hand-written ledger may lack the sent date; `loadLedger` does not require it.
   const sent = (entry: LedgerEntry) => `sent ${entry.dates.sent ?? "(date not recorded)"}`;
-  const lines = [
-    ...overdueOn(ledger, env.today).map(
-      ({ entry, daysOverdue }) =>
-        `${entry.broker}: ${sent(entry)}, due ${entry.dates.due}, ${daysOverdue} ${daysOverdue === 1 ? "day" : "days"} overdue`,
-    ),
+  const findings: { broker: string; line: string }[] = [
+    ...overdueOn(ledger, env.today).map(({ entry, daysOverdue }) => ({
+      broker: entry.broker,
+      line: `${entry.broker}: ${sent(entry)}, due ${entry.dates.due}, ${daysOverdue} ${daysOverdue === 1 ? "day" : "days"} overdue`,
+    })),
     // Passing a request that cannot be judged silently would be a false green.
-    ...sentWithoutDueDate(ledger).map((entry) => `${entry.broker}: ${sent(entry)}, no due date recorded`),
+    ...sentWithoutDueDate(ledger).map((entry) => ({ broker: entry.broker, line: `${entry.broker}: ${sent(entry)}, no due date recorded` })),
     // A confirmed send that may have reached the broker stays visible until the human resolves it.
-    ...submittedWithoutReceipt(ledger).map((entry) => `${entry.broker}: submitted ${entry.dates.submitted}, no receipt`),
+    ...submittedWithoutReceipt(ledger).map((entry) => ({
+      broker: entry.broker,
+      line: `${entry.broker}: submitted ${entry.dates.submitted}, no receipt`,
+    })),
     // The human took it to the authority; it stays red every day until `reply` records the broker's answer.
-    ...escalatedWithoutReply(ledger).map((entry) => `${entry.broker}: ${stateAndDate(entry)}, no reply`),
+    ...escalatedWithoutReply(ledger).map((entry) => ({ broker: entry.broker, line: `${entry.broker}: ${stateAndDate(entry)}, no reply` })),
   ];
-  if (lines.length === 0) {
+  if (json) {
+    env.print(JSON.stringify(findings));
+    return findings.length === 0 ? 0 : 1;
+  }
+  if (findings.length === 0) {
     env.print("nothing is overdue");
     return 0;
   }
-  for (const line of lines) env.print(line);
+  for (const { line } of findings) env.print(line);
   return 1;
 }
 

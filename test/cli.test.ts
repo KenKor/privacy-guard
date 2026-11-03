@@ -95,6 +95,14 @@ describe("the ledger's old name", () => {
 });
 
 describe("privacy-guard report", () => {
+  it("prints the findings as one JSON array with --json, with the same exit code", async () => {
+    expect(await run(["report", "--json"])).toEqual({ code: 0, output: "[]" });
+    expect(await run(["report", "--json"], withLedger([sentToBrokerA]), { today: "2026-11-13" })).toEqual({
+      code: 1,
+      output: JSON.stringify([{ broker: "broker-a", line: "broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue" }]),
+    });
+  });
+
   const sentToBrokerA: LedgerEntry = { broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } };
 
   it("says nothing is overdue on an empty ledger", async () => {
