@@ -4,7 +4,7 @@
 // A request's due date is one calendar month from sending, moved off a weekend (`dueDate`); whoever records the send stores it.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-export const DEFAULT_LEDGER_PATH = "ledger.json";
+export const DEFAULT_LEDGER_PATH = "privacy-guard-ledger.json";
 
 // Overdue is not a state: it is derived on every read (`overdueOn`), never stored.
 export const STATES = ["drafted", "sent", "acknowledged", "escalated"] as const;
