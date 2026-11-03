@@ -1,0 +1,99 @@
+name: Package
+
+# Release management (docs/agents/release.md). Builds the distribution package ONCE from the chosen ref:
+# the npm package, stamped major.minor.patch.build, with an SBOM and SHA256SUMS, uploaded as an Actions
+# artifact. In phase 0 it is a PREVIEW: nobody is asked anything about it, nothing is tagged, no GitHub
+# release is made. It never runs on PRs, so it costs the merge gate nothing.
+#
+# Build number: this workflow's run_number plus the repo variable RELEASE_BUILD_OFFSET (default 0), so every
+# packaged build has its own number. The version is package.json's "version"; only the release-manager
+# changes it, in a PR.
+#
+# Start it: gh workflow run package.yml --ref <branch>   (or /release candidate)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.18"
+          cache: npm
+
+      - name: Install and test
+        run: |
+          npm ci
+          npm run lint
+          npm test
+
+      - name: Version and build number
+        id: v
+        env:
+          BUILD_OFFSET: ${{ vars.RELEASE_BUILD_OFFSET || '0' }}
+        run: |
+          case "$BUILD_OFFSET" in ''|*[!0-9]*) echo "::error::RELEASE_BUILD_OFFSET must be digits; found '$BUILD_OFFSET'"; exit 1;; esac
+          version=$(node -p 'require("./package.json").version')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::package.json version must be major.minor.patch; found '$version'"; exit 1; }
+          build=$(( GITHUB_RUN_NUMBER + 10#$BUILD_OFFSET ))
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "full=$version.$build" >> "$GITHUB_OUTPUT"
+          echo "Packaging $version.$build from $GITHUB_REF_NAME @ $GITHUB_SHA"
+
+      - name: Package, SBOM and checksums
+        env:
+          FULL: ${{ steps.v.outputs.full }}
+        run: |
+          mkdir -p dist
+          tgz=$(npm pack --silent --pack-destination dist)
+          mv "dist/$tgz" "dist/privacy-guard-$FULL.tgz"
+          # The package must not carry a subject file or a ledger: those hold the user's personal data.
+          if tar -tzf "dist/privacy-guard-$FULL.tgz" | grep -E '(^|/)(subject\.yaml|ledger\.json)$'; then
+            echo "::error::the package carries personal data files"; exit 1
+          fi
+          npm sbom --sbom-format cyclonedx --omit dev > "dist/privacy-guard-$FULL.sbom.json"
+          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+
+      - name: Summary
+        env:
+          FULL: ${{ steps.v.outputs.full }}
+        run: |
+          {
+            echo "### Package privacy-guard-$FULL (preview)"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | ${{ steps.v.outputs.version }} |"
+            echo "| Build | ${{ steps.v.outputs.build }} |"
+            echo "| Ref | $GITHUB_REF_NAME |"
+            echo "| Commit | $GITHUB_SHA |"
+            echo "| Signed | no |"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: privacy-guard-${{ steps.v.outputs.full }}
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
