@@ -3,8 +3,21 @@
 // no personal data.
 // A request's due date is one calendar month from sending, moved off a weekend (`dueDate`); whoever records the send stores it.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 
-export const DEFAULT_LEDGER_PATH = "ledger.json";
+export const DEFAULT_LEDGER_PATH = "privacy-guard-ledger.json";
+/** The ledger's name before 0.2.0. */
+export const OLD_LEDGER_NAME = "ledger.json";
+
+/**
+ * The old ledger next to `path`, when `path` is the default name, does not exist yet, and the old file
+ * does: reading on would show an empty ledger and report "nothing is overdue" over open requests.
+ */
+export function oldLedgerInstead(path: string): string | undefined {
+  if (basename(path) !== DEFAULT_LEDGER_PATH || existsSync(path)) return undefined;
+  const old = join(dirname(path), OLD_LEDGER_NAME);
+  return existsSync(old) ? old : undefined;
+}
 
 // Overdue is not a state: it is derived on every read (`overdueOn`), never stored.
 export const STATES = ["drafted", "sent", "acknowledged", "escalated"] as const;

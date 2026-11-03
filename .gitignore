@@ -1,5 +1,6 @@
 node_modules/
 dist/
 .privacy-guard/
+privacy-guard-ledger.json
 ledger.json
 subject.yaml

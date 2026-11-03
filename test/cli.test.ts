@@ -68,6 +68,32 @@ describe("privacy-guard due", () => {
   });
 });
 
+describe("the ledger's old name", () => {
+  it("refuses every command while only ledger.json exists, and changes nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "old-ledger-"));
+    const old = join(dir, "ledger.json");
+    saveLedger(old, { entries: [{ broker: "broker-a", state: "sent", dates: { sent: "2026-10-12", due: "2026-11-12" } }] });
+    const before = readFileSync(old, "utf8");
+    const ledgerPath = join(dir, "privacy-guard-ledger.json");
+    for (const argv of [["report"], ["due"], ["draft", "broker-a"]]) {
+      expect(await run(argv, ledgerPath, { today: "2026-11-13" })).toEqual({
+        code: 1,
+        output: `found ${old}, the ledger's old name. Rename it to ${ledgerPath}, then run the command again. Nothing was changed.`,
+      });
+    }
+    expect(existsSync(ledgerPath)).toBe(false);
+    expect(readFileSync(old, "utf8")).toBe(before);
+  });
+
+  it("reads the new ledger when both exist", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "both-ledgers-"));
+    saveLedger(join(dir, "ledger.json"), { entries: [] });
+    const ledgerPath = join(dir, "privacy-guard-ledger.json");
+    saveLedger(ledgerPath, { entries: [] });
+    expect(await run(["report"], ledgerPath)).toEqual({ code: 0, output: "nothing is overdue" });
+  });
+});
+
 describe("privacy-guard report", () => {
   it("prints the findings as one JSON array with --json, with the same exit code", async () => {
     expect(await run(["report", "--json"])).toEqual({ code: 0, output: "[]" });

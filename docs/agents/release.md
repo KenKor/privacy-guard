@@ -51,7 +51,7 @@ Milestone for the next release: `2026-Q4`.
 What a user relies on, and what may change only in a major release:
 
 - The commands, their arguments and options, their output lines and their exit codes (README, Commands)
-- The ledger file: its name (`ledger.json`), where it is looked for, and its format
+- The ledger file: its name (`privacy-guard-ledger.json`; `ledger.json` before 0.2.0), where it is looked for, and its format
 - The subject file (`subject.yaml`): its name and its keys
 - The broker playbook format (`brokers/<name>.yaml`)
 - The dry-run rule: nothing is sent without `--confirm`
