@@ -197,7 +197,7 @@ The escalated request stays in `report` every day until you record broker A's re
 | `escalate <broker> [YYYY-MM-DD]` | Records that you took an overdue request to the authority | 0; 1 on refusal |
 | `receipt <broker> [reference]` | Records that a submission without a receipt did arrive | 0; 1 on refusal |
 | `discard <broker>` | Removes a submission without a receipt that did not arrive | 0; 1 on refusal |
-| `report` | Lists what needs you | 0 if nothing; 1 if anything |
+| `report [--json]` | Lists what needs you, as text or as JSON | 0 if nothing; 1 if anything |
 | `due` | Lists open requests whose due date is today or earlier | 0 |
 
 An unknown command name prints the usage line and exits 2. So do `reply`, `escalate`, `receipt` and
@@ -207,7 +207,9 @@ An unknown command name prints the usage line and exits 2. So do `reply`, `escal
 - `draft` ignores extra arguments and unknown flags. For example, `draft broker-a --sho` drafts
   with the values hidden.
 - `send` refuses a second broker or an unknown flag with exit 1. See the confirmed send below.
-- `report` and `due` ignore any arguments.
+- `report` ignores any argument other than `--json`. A mistyped flag such as `report --jsn` prints
+  the plain text lines.
+- `due` ignores any arguments.
 
 A broker has at most one **open request**: one that is drafted, sent or escalated, with no reply
 recorded yet.
@@ -321,7 +323,7 @@ The date follows the same rules as for `reply`.
 These two commands resolve a confirmed send that got no receipt. They are explained in
 [When a send gets no receipt](#when-a-send-gets-no-receipt).
 
-### `report`
+### `report [--json]`
 
 Lists everything that needs your attention, one line each, and exits 1 if there is at least one
 line. If there is nothing, it prints `nothing is overdue` and exits 0.
@@ -334,6 +336,28 @@ line. If there is nothing, it prints `nothing is overdue` and exits 0.
 | `broker-x: sent 2026-09-01, no due date recorded` | A hand-edited ledger entry can't be checked | fix the entry in `ledger.json` |
 
 `report` never changes the ledger, and you can't snooze a line.
+
+**`--json`** prints the same findings for a script to read: one JSON array on a single line, with
+one object per line of the text report. Each object has two fields:
+
+| Field | Holds |
+|---|---|
+| `broker` | The broker's name, such as `broker-a` |
+| `line` | The text line that `report` would print for it, unchanged |
+
+The findings come in the same order as the text lines, and the exit code is the same: 0 when the
+array is empty, 1 when it holds anything. When nothing needs you, `report --json` prints `[]`
+instead of `nothing is overdue`.
+
+```console
+$ privacy-guard report --json        # on 2026-11-12, the due date: not overdue yet
+[]
+
+$ privacy-guard report --json        # on 2026-11-13, with no reply recorded
+[{"broker":"broker-a","line":"broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue"}]
+```
+
+Error messages, such as an unreadable ledger, are not JSON.
 
 ### `due`
 
