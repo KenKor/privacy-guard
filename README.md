@@ -22,6 +22,7 @@ overdue, and so on) are defined in [GLOSSARY.md](GLOSSARY.md).
 - [When a send gets no receipt](#when-a-send-gets-no-receipt)
 - [Run `report` on a schedule](#run-report-on-a-schedule)
 - [What is stored where](#what-is-stored-where)
+  - [Rename an old `ledger.json`](#rename-an-old-ledgerjson)
 - [Known limitations](#known-limitations)
 
 ## Before you start
@@ -29,7 +30,9 @@ overdue, and so on) are defined in [GLOSSARY.md](GLOSSARY.md).
 - Node.js 22.18 or later. privacy-guard runs its TypeScript directly, so there is no build step.
 - Install the dependencies once: `npm install`.
 - **Run every command from the repository root.** privacy-guard looks for `subject.yaml`,
-  `ledger.json` and the `brokers/` folder in the current directory.
+  `privacy-guard-ledger.json` and the `brokers/` folder in the current directory.
+- **Already have a `ledger.json`?** The ledger used to be called `ledger.json`. Rename it before
+  you run any command; see [Rename an old `ledger.json`](#rename-an-old-ledgerjson).
 
 The examples below are written as `privacy-guard <command>`. To run the commands as written, run
 `npm link` once. Otherwise, run `node bin/privacy-guard.js <command>`.
@@ -268,8 +271,8 @@ Refusals (exit 1, nothing is sent):
 - `no drafted request for broker-a. Draft one first: privacy-guard draft broker-a`
 - `send takes one broker and only --confirm and --show; refusing: --confrim. Nothing was sent.`: a
   mistyped flag or a second broker is refused. It is never treated as a dry run.
-- `broker-a has 2 drafted requests in ledger.json; expected one. Nothing was sent.`: this happens
-  only after someone edits the ledger by hand.
+- `broker-a has 2 drafted requests in privacy-guard-ledger.json; expected one. Nothing was sent.`:
+  this happens only after someone edits the ledger by hand.
 - `nothing was sent to broker-a: the connection failed (ECONNREFUSED)` (or `ENOTFOUND`): the
   connection was never made, so broker A received nothing. The request stays drafted, and you can
   send again once the site is reachable.
@@ -331,7 +334,7 @@ line. If there is nothing, it prints `nothing is overdue` and exits 0.
 | `broker-a: sent 2026-10-12, due 2026-11-12, 1 day overdue` | The due date has passed with no reply | `reply`, or `escalate` and later `reply` |
 | `broker-a: submitted 2026-10-12, no receipt` | A confirmed send may have arrived, but there is no receipt | `receipt`, `discard`, or a send that gets a receipt |
 | `broker-a: escalated 2026-11-16, no reply` | You escalated; the broker still hasn't replied | `reply` |
-| `broker-x: sent 2026-09-01, no due date recorded` | A hand-edited ledger entry can't be checked | fix the entry in `ledger.json` |
+| `broker-x: sent 2026-09-01, no due date recorded` | A hand-edited ledger entry can't be checked | fix the entry in `privacy-guard-ledger.json` |
 
 `report` never changes the ledger, and you can't snooze a line.
 
@@ -340,7 +343,7 @@ line. If there is nothing, it prints `nothing is overdue` and exits 0.
 Lists every request that is not acknowledged and whose due date is today or earlier, including
 escalated ones, as `broker-a: sent, due 2026-11-12`. If there are none, it prints `nothing is due`.
 `due` exits 0 whatever it lists, so use `report` for scheduled checks. (Like every command, it
-exits non-zero if `ledger.json` can't be read.)
+exits non-zero if `privacy-guard-ledger.json` can't be read.)
 
 ## When a send gets no receipt
 
@@ -423,7 +426,7 @@ you should look:
 | Exit | Meaning |
 |---|---|
 | 0 | Nothing is overdue, unresolved or escalated (`nothing is overdue`) |
-| 1 | At least one line needs you: an overdue request, a submission without a receipt, an escalated request without a reply, or a sent request without a due date. An error such as an unreadable `ledger.json` also exits non-zero. |
+| 1 | At least one line needs you: an overdue request, a submission without a receipt, an escalated request without a reply, or a sent request without a due date. An error such as an unreadable `privacy-guard-ledger.json`, or an old `ledger.json` that still needs renaming, also exits non-zero. |
 | 2 | Usage error (the command line is wrong) |
 
 For example, this cron entry checks every morning at 08:00 and prints `report`'s lines only when
@@ -436,8 +439,8 @@ the path with your own:
 
 Some points to check:
 
-- Change to the repository directory first (`cd`), because `report` reads `ledger.json` from the
-  current directory. Run it from somewhere else and it finds no ledger, so it reports nothing.
+- Change to the repository directory first (`cd`), because `report` reads
+  `privacy-guard-ledger.json` from the current directory. Run it from somewhere else and it finds no ledger, so it reports nothing.
 - cron's `PATH` must find Node 22.18 or later. If it doesn't, write the full path to `node`.
 - `report` only reads the ledger. It never sends anything, so it is safe to run on a schedule.
 - A red `report` stays red until you act. An overdue request stays listed until you record a reply.
@@ -448,7 +451,7 @@ Some points to check:
 | File | Holds | In git |
 |---|---|---|
 | `subject.yaml` | The subject's details (personal data) | no, ignored |
-| `ledger.json` | One entry per request: broker, state, dates, receipt reference. No personal data. Created by the first `draft`. | no, ignored |
+| `privacy-guard-ledger.json` | One entry per request: broker, state, dates, receipt reference. No personal data. Created by the first `draft`. | no, ignored |
 | `brokers/<broker>.yaml` | The broker's playbook: its form, fields and receipt pattern | yes |
 | `.privacy-guard/confirmed` | Your one-time approval for an agent's send (see the confirmed send) | no, ignored |
 
@@ -470,6 +473,30 @@ A ledger entry after the send in the example:
 The `dates` object can also hold `submitted` (a confirmed send without a receipt), `acknowledged`
 (the reply) and `escalated`.
 
+### Rename an old `ledger.json`
+
+The ledger used to be called `ledger.json`. It is now `privacy-guard-ledger.json`, in the same
+place. The contents are unchanged, so the file only needs a new name.
+
+If the current directory has a `ledger.json` but no `privacy-guard-ledger.json`, every command stops
+before it does anything and exits 1:
+
+```console
+$ privacy-guard report
+found ledger.json, the ledger's old name. Rename it to privacy-guard-ledger.json, then run the command again. Nothing was changed.
+```
+
+privacy-guard doesn't rename the file for you, and doesn't read or change it. This way, `report`
+can't say `nothing is overdue` while your open requests sit in the old file. Rename it in the
+repository root, then run the command again:
+
+```console
+$ mv ledger.json privacy-guard-ledger.json
+```
+
+If both files exist, privacy-guard reads `privacy-guard-ledger.json` and ignores `ledger.json`.
+Git ignores both names.
+
 ## Known limitations
 
 - **Broker A only.** Broker A is the only broker with a playbook, and a web form is the only
@@ -483,7 +510,7 @@ The `dates` object can also hold `submitted` (a confirmed send without a receipt
 - **A reused reference counts as a receipt.** Suppose broker A answers a new request with the
   reference it gave an earlier one. privacy-guard still records the request as sent and starts a
   deadline that broker A may not be honouring. Compare the reference with your earlier requests
-  (`ledger.json`) after each send. Issue #34 tracks this.
+  (`privacy-guard-ledger.json`) after each send. Issue #34 tracks this.
 
 The design decisions behind this behaviour are in the PRD,
 [docs/prds/completed/opt-out-broker-a.md](docs/prds/completed/opt-out-broker-a.md).
