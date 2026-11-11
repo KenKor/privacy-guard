@@ -29,8 +29,7 @@ Edit the "Label in our tracker" column to match whatever vocabulary you actually
 
 Besides its category and its one state label, every triaged ticket gets **one scope**:
 
-- **a milestone**: the release it is needed for (the milestones are listed in `docs/agents/release.md`,
-  "Labels and milestones", where that file exists); or
+- **a milestone**: the release it is needed for (the repo's open milestones on GitHub); or
 - **`later`**: it side-tracks. Useful, but not strictly necessary for the next release.
 
 `later` is not a state role. It sits next to the state label, which stays as it is, so promoting a
