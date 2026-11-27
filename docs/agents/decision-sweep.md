@@ -52,6 +52,7 @@ One row per sweep, added in its sweep PR.
 
 | Date | Sweep PR | Decided | For a human |
 |---|---|---|---|
+| 2026-11-27 | #59 | 3 | 3 |
 
 ## Blind checks
 
