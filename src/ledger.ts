@@ -93,8 +93,9 @@ export function dueDate(sent: string): string {
 
 /** Whether `date` is YYYY-MM-DD and a day the calendar has (not 2026-02-30). */
 export function isCalendarDate(date: string): boolean {
+  if (!ISO_DATE.test(date)) return false;
   const [year, month, day] = date.split("-").map(Number);
-  return ISO_DATE.test(date) && month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
 }
 
 function daysInMonth(year: number, month: number): number {
