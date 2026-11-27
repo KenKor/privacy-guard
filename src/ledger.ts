@@ -62,7 +62,7 @@ export function loadLedger(path: string = DEFAULT_LEDGER_PATH): Ledger {
     }
     if (entry.reference !== undefined && typeof entry.reference !== "string") fail("reference must be a string");
     for (const [name, date] of Object.entries(entry.dates)) {
-      if (typeof date !== "string" || !ISO_DATE.test(date)) fail(`dates.${name} "${date}" is not a YYYY-MM-DD date`);
+      if (typeof date !== "string" || !isCalendarDate(date)) fail(`dates.${name} "${date}" is not a YYYY-MM-DD date`);
     }
   }
   return ledger;
