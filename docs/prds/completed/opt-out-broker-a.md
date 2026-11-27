@@ -955,6 +955,199 @@ Rejected:
 - `send` without a broker, sending every `drafted` entry (the skeleton's behaviour, `src/cli.ts` lines
   42-56). One approval would reach every broker with a draft.
 
+### Sweep of 2026-11-27: #32 and #40
+
+**Swept 2026-11-27 by Claude Opus 5.5 against `roles` at `c939d3b`, on the owner's criteria (correct
+and to the point; designed for growth; designed for change), premises verified in the tree; verifier:
+D-21 and D-22 HOLD; D-19 REFUTED (`due` gives a wrong all-clear), now split into D-19, decided, and D-23, for a human.** Decided here, pending the owner's review, each with how to reverse it: D-19, D-21,
+D-22. **For a human:** D-18, D-20, D-23. D-22 is built from issue #58, which carries the agent brief.
+Item 2 of #40 needs no decision: it was issue #56, merged in PR #57 (`c939d3b`).
+
+#### Premises, verified at triage
+
+All hold at `c939d3b`, with three corrections to #40's wording (the issue's text is left as it was;
+the corrections are here and in the sweep's comment on #40):
+
+- `escalate` (`src/cli.ts:197-215`) takes the broker's open request only when `isOverdue(entry, today)`
+  (`src/ledger.ts:142-144`: state `sent`, `today > dates.due`), then checks the given date with
+  `dateRefusal` (`src/cli.ts:287-292`): a calendar date, not after today, not before `dates.sent`.
+  Nothing compares it with `dates.due`. #32's example holds: sent 2026-10-12, due 2026-11-12, today
+  2026-11-16, `escalate broker-a 2026-10-20` records `escalated` on 2026-10-20.
+- D-1 (above) was walked with the user on 2026-10-12, and its option (b) as walked says "its date
+  follows `reply`'s rules (a real date, not after today, not before `dates.sent`)"; Commands,
+  `escalate`, says the same. The **Escalated** entry in `GLOSSARY.md` ("an overdue request the subject
+  has taken to a supervisory authority") dates from the same day (`df42e32`).
+- `loadLedger` (`src/ledger.ts:46-69`) checks each entry's state, that `dates` is an object, the
+  reference's type and each date's shape; not which dates a state needs. **Correction to #40, item 1:**
+  `reply` no longer compares with `entry.dates.sent!`; `dateRefusal` skips the check on purpose when
+  `dates.sent` is missing (`src/cli.ts:290`). The field is `dates.acknowledged`, not `dates.replied`.
+  The tool never writes a `sent` entry without `dates.sent` and `dates.due`: `recordSent`
+  (`src/ledger.ts:161-167`) sets both. It already reads entries with missing dates visibly: `report`
+  prints "sent (date not recorded)" (`src/cli.ts:119`) and warns about a `sent` entry with no due date
+  (`sentWithoutDueDate`, `src/ledger.ts:147-149`; Commands, `report`, citing D-11 and D-14); `escalate` refuses one
+  without a due date (`src/cli.ts:222`). **But `due` does not:** `dueOn` (`src/ledger.ts:119-122`) leaves
+  out an entry with no `dates.due`, and `due` (`src/cli.ts:104-112`) then prints "nothing is due", exit 0.
+  The tool also writes `sent` entries without a `reference` (`recordSent` with none, D-15). README.md:334
+  tells the user to fix such an entry by hand.
+- **Correction to #40, item 2:** `isCalendarDate` was already in `src/ledger.ts`, not in `src/cli.ts`.
+  The item was issue #56, merged in `c939d3b`.
+- `dry_run: true` is in `brokers/broker-a.yaml:26` and in this PRD's playbook example (Playbook);
+  `Playbook` declares `dry_run?: boolean` (`src/playbook.ts:38`). Nothing in `src/` or `test/` reads
+  it. `parsePlaybook` does not reject keys it does not know, so a playbook that keeps the key loads
+  whether or not the type declares it.
+- `.claude/hooks/deny-outward-send.sh` lines 6-9 list the forms of `privacy-guard send` the patterns
+  catch ("however the CLI is run"), and lines 12-14 call the patterns a tripwire, not a wall, as this
+  PRD does (Guarding the send). The hook is agent tooling in `.claude/`, not part of the
+  `privacy-guard` command.
+- `saveLedger` (`src/ledger.ts:71-73`) is `writeFileSync(path, ...)`, which truncates the file and then
+  writes it. A write that fails part way (disk full, the process killed) leaves a cut-off file;
+  `loadLedger` then refuses it as "not valid JSON" (`src/ledger.ts:52`), and every request in it is
+  lost to the tool. **Correction to #40's second comment:** after a failed write, `send` prints
+  "could not be written ... Record it by hand: ..." (`src/cli.ts:345-354`), not "the ledger still says
+  drafted"; that advice is wrong when the file was cut off, since there is no ledger left to edit.
+
+#### In flight at triage
+
+None. PR #57 (#40's item 2, #56) merged into `roles` as `c939d3b` during this sweep; it changed only
+the date check in `loadLedger` and `isCalendarDate`. No open PR or remote branch based on `roles`
+changes `escalate`, `due`, `saveLedger`, the playbook's `dry_run` or the hook. The `openspec` and
+`openspec-brownfield` branches change the same files, but they are the course's other storylines, not
+work headed for `roles`.
+
+#### D-18. Does `escalate` refuse a date on or before the due date? (#32) — recommended **(a)** — certainty: 85%; **FOR HUMAN**
+
+- **What it decides.** Which escalation dates `escalate` records. It would amend D-1, whose walked
+  answer set the date rule. On it hang: `escalate`'s refusals and their message, the Commands line for
+  `escalate`, and the tests in `test/cli.test.ts` for it. Nothing else reads `dates.escalated` except
+  `report`'s line.
+- **Facts.** See Premises: the date is checked only against today and `dates.sent`; D-1 as walked chose
+  that rule; **Escalated** in `GLOSSARY.md` is "an overdue request", and **Overdue** is "no reply after
+  its due date has passed", so a date on or before `dates.due` records an escalation of a request that
+  was not overdue on that date.
+- **Options.** (a) Refuse a date on or before `dates.due`, naming it: "date 2026-10-20 is not after the
+  due date, 2026-11-12". Costs: one check in `escalate` (not in the shared `dateRefusal`, which `reply`
+  uses), one test, one Commands line. Degrades: a human who went to the authority early for another
+  reason cannot record that date and records the first overdue day or later. (b) Keep D-1's rule and
+  change the glossary: **Escalated** becomes "a request the subject has taken to a supervisory
+  authority", recorded once it is overdue. Costs: one glossary edit. Degrades: the ledger can hold an
+  escalation dated before the due date, and `report` prints it as such.
+- **Recommendation (a).** Criterion 1: the ledger then says only what the glossary defines, and the
+  date check sits in the one command that knows the due date.
+- **Why it is a human's.** Checklist line 3: D-1, walked with the user, set the date rule. Line 5:
+  what counts as escalated is a reading of the law (this repo's addition), and what `escalate` refuses
+  is what the user sees.
+
+#### D-19. Does loading a ledger fail when a state lacks the fields #40 lists? (#40, item 1, first half) — **(b)** — certainty: 97%; **DECIDED 2026-11-27**
+
+- **What it decides.** Whether `loadLedger` gets #40's table of required fields per state. The other
+  half, what `due` says about a `sent` entry with no due date, is D-23, for a human.
+- **Facts.** See Premises: #40 asks for `reference` on every `sent` entry, but the tool writes `sent`
+  entries without one (D-15, `receipt` with no reference); `report` warns about a `sent` entry without a
+  due date instead of refusing the ledger (Commands, `report`).
+- **Options.** (a) `loadLedger` fails, naming the entry, when a state lacks what #40 lists. Costs: a
+  table per state; every command refuses the whole ledger over one entry. (b) No load check; the wrong
+  answer such an entry causes is fixed where it is given (D-23).
+- **Chosen (b).** Criterion 1: (a) as worded refuses ledgers the tool wrote itself, and refuses the
+  whole ledger where `report` was built to warn about one entry. The 3%: a narrower load check (dates
+  only, without `reference`) could still be what the owner wants; D-23 puts that option to them.
+- **Rejected.** (a): it breaks D-15's `sent` entry without a reference.
+- **Propagated.** This entry; the sweep's comment on #40.
+- **Rests on.** D-15; Commands, `report`.
+- **To reverse.** File the load check as a ticket, without `reference` for `sent`.
+- **Reconsider when.** Another command than `due` gives a wrong answer for such an entry.
+- **Reversal cost.** cheap
+- **Review.** never reviewed
+- **Verifier.** First taken as "not filed, 96%": refuted, because `due` prints "nothing is due" for a
+  `sent` entry with no due date, a wrong all-clear (checked: `src/ledger.ts:119-122`, `src/cli.ts:104-112`).
+
+#### D-23. What does `due` say about a `sent` entry with no due date? (#40, item 1, second half) — recommended **(a)** — certainty: 85%; **FOR HUMAN**
+
+- **What it decides.** The answer `due` gives for an entry it cannot judge. On it hang: `dueOn` or
+  `due`, a test, the README's `due` section.
+- **Facts.** See Premises: `due` prints "nothing is due", exit 0, while `report` warns about the same
+  entry and exits 1. The scope gate always files a wrong result a user could take as right.
+- **Options.** (a) `due` lists it with `report`'s words, "broker-x: sent 2026-09-01, no due date
+  recorded"; exit stays 0, as for every `due` line. Costs: a few lines, reusing `sentWithoutDueDate`.
+  (b) `loadLedger` refuses a `sent` entry without `dates.sent` or `dates.due` (dates only). Costs: every
+  command stops over one entry, and `report`'s warning becomes dead code. (c) Leave it: `report` already
+  shows it.
+- **Recommendation (a).** Criterion 1: the all-clear stops being wrong, and the knowledge of such an
+  entry stays in the one query `report` already uses (criterion 3).
+- **Why it is a human's.** Checklist line 5: what `due` shows, and whether anything refuses, is what the
+  user sees.
+
+#### D-20. What happens to `dry_run: true` in a playbook? (#40, item 3) — recommended **(a)** — certainty: 85%; **FOR HUMAN**
+
+- **What it decides.** Whether a playbook can stop a confirmed send. On it hang: `brokers/broker-a.yaml`,
+  `Playbook` in `src/playbook.ts`, this PRD's playbook example, and with (b) `send` and its tests.
+- **Facts.** See Premises: nothing reads the key, and a confirmed send ignores it; what keeps a send a
+  dry run is `--confirm` and the hook's one-shot marker (Guarding the send, D-4, D-13).
+- **Options.** (a) Drop the key from `broker-a.yaml`, the `Playbook` type and this PRD's example.
+  Costs: three lines. Degrades: nothing; a playbook that keeps the key still loads, since unknown keys
+  are not rejected. (b) A confirmed send refuses a playbook with `dry_run: true`. Costs: a check in
+  `send`, a test, and `broker-a.yaml` then needs `dry_run: false` or no key, or broker A cannot be sent
+  to at all. Degrades: a second switch for one question, which the user must keep in step with
+  `--confirm`.
+- **Recommendation (a).** Criterion 3: one mechanism decides whether a request is sent, `--confirm`
+  with the human's marker; a second switch in the data is a second place for the same knowledge.
+- **Why it is a human's.** Checklist line 5: it decides whether a request is really sent (this repo's
+  addition), and the playbook key is what a reader of `brokers/` sees.
+
+#### D-21. Does the hook's header comment change? (#40, first comment) — **(b)** — certainty: 97%; **DECIDED 2026-11-27**
+
+- **What it decides.** Whether the hook's header comment becomes work. Nothing waits on it.
+- **Facts.** See Premises: lines 6-9 list the forms the patterns catch, lines 12-14 say the patterns
+  are a tripwire, as this PRD does. The hook is agent tooling in `.claude/`; the package is `"private": true`,
+  so it never ships. README.md:279-283 mentions the repo's hooks to users, but not this header.
+- **Options.** (a) Reword lines 6-9 to match "tripwire". (b) Not filed: no user hits it.
+- **Chosen (b).** Criterion 1: by the scope gate (`docs/agents/triage-labels.md`) a ticket needs a user
+  who sees something wrong, and a comment in agent tooling that already says "tripwire, not a wall" has
+  none. The 3%: a reader may take line 7 as a promise when it is read without line 12.
+- **Rejected.** (a): a ticket for a wording preference in code no user reaches.
+- **Propagated.** This entry; the sweep's comment on #40 records it as `not filed`.
+- **Rests on.** `CLAUDE.md`, Scope; the scope gate.
+- **To reverse.** File the rewording as a ticket.
+- **Reconsider when.** The hook ships with the package or the user docs quote its header.
+- **Reversal cost.** cheap
+- **Review.** never reviewed
+
+#### D-22. How does `saveLedger` survive a failed write? (#40, second comment) — **(a)** — certainty: 97%; **DECIDED 2026-11-27**
+
+- **What it decides.** That the second comment becomes its own ticket (issue #58), and how it is
+  built. The scope gate files it whatever the answer: it is lost data.
+- **Facts.** See Premises: `writeFileSync` truncates before it writes; a cut-off file fails to load,
+  and `send`'s advice after a failed write then has no ledger to apply to.
+- **Options.** (a) Write the whole ledger to a temporary file in the same directory, then rename it over
+  the ledger; on a failed write or rename the old ledger stays as it was and the temporary file is
+  removed where possible. Costs: a few lines in `saveLedger` (with an fsync of the temporary file before
+  the rename, so a power loss also leaves one whole file), one test that makes the write fail. (b)
+  Copy the ledger to a backup file before each write. Costs: a second file next to the ledger, which
+  still truncates the ledger itself, and a rule for when the backup is read. (c) Leave it.
+- **Chosen (a).** Criterion 1: a rename within one directory replaces the file whole or not at all, so
+  the ledger is either the old one or the new one, and `send`'s "record it by hand" advice holds. The
+  3%: on Windows a rename over a file another process holds open can fail; then the old ledger stays,
+  which is the case `send` already reports.
+- **Rejected.** (b): two files for one record, and the ledger can still be cut off. (c): lost data is
+  always filed.
+- **Propagated.** This entry; issue #58 with the agent brief.
+- **Rests on.** None.
+- **To reverse.** Revert the PR that builds #58.
+- **Reconsider when.** The ledger moves to another store, or a supported platform where a rename over
+  an existing file is not atomic.
+- **Reversal cost.** cheap
+- **Review.** never reviewed
+
+#### Summary
+
+| ID | DECIDE/HUMAN | chosen | certainty | criterion | one-line reason |
+|---|---|---|---|---|---|
+| D-18 | HUMAN | recommended (a) refuse a date on or before `dates.due` | 85% | 1 | reopens D-1's walked date rule; reads what counts as escalated |
+| D-19 | DECIDE | (b) no load check as #40 words it | 97% | 1 | it would refuse `sent` entries the tool writes (D-15) |
+| D-20 | HUMAN | recommended (a) drop `dry_run` | 85% | 3 | decides whether a request is sent |
+| D-21 | DECIDE | (b) not filed | 97% | 1 | agent tooling; it already says tripwire |
+| D-22 | DECIDE | (a) temp file, then rename | 97% | 1 | the ledger is the old one or the new one, never cut off |
+| D-23 | HUMAN | recommended (a) `due` lists it as `report` does | 85% | 1 | what `due` shows is what the user sees |
+
 ## Implementation plan
 
 Each item is one ticket, sized for one session. Items 2, 3, 4, 7 and 8 edit `src/cli.ts` or
