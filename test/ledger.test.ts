@@ -56,6 +56,20 @@ describe("ledger", () => {
     expect(() => loadLedger(path)).toThrow(`${path}: entry 0: dates.due "12/10/2026" is not a YYYY-MM-DD date`);
   });
 
+  it("rejects a date the calendar does not have, naming the entry and the field", () => {
+    const path = tmpLedger();
+    writeFileSync(
+      path,
+      JSON.stringify({
+        entries: [
+          { broker: "broker-a", state: "acknowledged", dates: { sent: "2026-01-30", acknowledged: "2026-02-03" } },
+          { broker: "broker-b", state: "sent", dates: { drafted: "2026-02-27", sent: "2026-02-30", due: "2026-03-30" } },
+        ],
+      }),
+    );
+    expect(() => loadLedger(path)).toThrow(`${path}: entry 1: dates.sent "2026-02-30" is not a YYYY-MM-DD date`);
+  });
+
   it("round-trips a receipt reference and a submission date", () => {
     const path = tmpLedger();
     const ledger: Ledger = {
